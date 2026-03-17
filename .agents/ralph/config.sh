@@ -1,0 +1,17 @@
+PRD_PATH=".agents/tasks/prd-city-expansion-sim.json"
+PROGRESS_PATH=".ralph/progress-city-expansion-sim.md"
+GUARDRAILS_PATH=".ralph/guardrails.md"
+ERRORS_LOG_PATH=".ralph/errors.log"
+ACTIVITY_LOG_PATH=".ralph/activity.log"
+TMP_DIR=".ralph/.tmp"
+RUNS_DIR=".ralph/runs"
+GUARDRAILS_REF=".agents/ralph/references/GUARDRAILS.md"
+CONTEXT_REF=".agents/ralph/references/CONTEXT_ENGINEERING.md"
+ACTIVITY_CMD=".agents/ralph/log-activity.sh"
+AGENT_CMD="codex exec --yolo --skip-git-repo-check -"
+PRD_AGENT_CMD="codex exec --yolo --skip-git-repo-check -"
+AGENTS_PATH="AGENTS.md"
+PROMPT_BUILD=".agents/ralph/PROMPT_build.md"
+NO_COMMIT=false
+MAX_ITERATIONS=2
+STALE_SECONDS=900

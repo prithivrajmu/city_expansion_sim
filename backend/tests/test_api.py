@@ -1,4 +1,49 @@
 from app.server import app
+from simulation.core.engine import Scenario, SimulationSession
+
+
+def make_strategy_scenario(district_strategies=None):
+    return Scenario(
+        id="district-strategy-test",
+        name="District Strategy Test",
+        description="Scenario used to verify district strategy modifiers.",
+        focus="District strategy behavior",
+        baseYear=2026,
+        ticksPerYear=4,
+        gridWidth=2,
+        gridHeight=1,
+        policyBoost=0.12,
+        residentDemand=0.66,
+        developerPressure=0.74,
+        infrastructureMomentum=0.71,
+        agentProfiles={
+            "residents": {"mobility": 1.0, "housingUrgency": 1.0},
+            "developers": {"capitalAggression": 1.0, "speculation": 1.0},
+            "government": {"deliveryBias": 1.0, "coordination": 1.0},
+        },
+        events=[],
+        cells=[
+            {
+                "district": "Growth District",
+                "kind": "urban",
+                "urbanized": True,
+                "population": 200,
+                "landValue": 150,
+                "risk": 0.2,
+                "access": 0.7,
+            },
+            {
+                "district": "Resilience District",
+                "kind": "urban",
+                "urbanized": True,
+                "population": 200,
+                "landValue": 150,
+                "risk": 0.2,
+                "access": 0.7,
+            },
+        ],
+        districtStrategies=district_strategies,
+    )
 
 
 def test_health_endpoint():
@@ -83,3 +128,39 @@ def test_scenario_events_affect_runtime_state():
     report_response = client.get(f"/sessions/{session_id}/report")
     report = report_response.get_json()
     assert len(report["scenarioEvents"]) >= 2
+
+
+def test_district_strategy_modes_change_runtime_behavior():
+    session = SimulationSession(
+        make_strategy_scenario(
+            {
+                "Growth District": {"mode": "growth_first"},
+                "Resilience District": {"mode": "resilience_first"},
+            }
+        )
+    )
+
+    session.tick()
+
+    growth_cell, resilience_cell = session.cells
+    assert growth_cell["access"] > resilience_cell["access"]
+    assert growth_cell["landValue"] > resilience_cell["landValue"]
+    assert growth_cell["population"] > resilience_cell["population"]
+    assert growth_cell["risk"] > resilience_cell["risk"]
+
+
+def test_district_without_strategy_uses_safe_defaults():
+    baseline_session = SimulationSession(make_strategy_scenario())
+    partial_strategy_session = SimulationSession(
+        make_strategy_scenario({"Growth District": {"mode": "growth_first"}})
+    )
+
+    baseline_session.tick()
+    partial_strategy_session.tick()
+
+    baseline_resilience = baseline_session.cells[1]
+    unconfigured_resilience = partial_strategy_session.cells[1]
+    assert unconfigured_resilience["access"] == baseline_resilience["access"]
+    assert unconfigured_resilience["landValue"] == baseline_resilience["landValue"]
+    assert unconfigured_resilience["population"] == baseline_resilience["population"]
+    assert unconfigured_resilience["risk"] == baseline_resilience["risk"]

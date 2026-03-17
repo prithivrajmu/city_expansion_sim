@@ -1,0 +1,124 @@
+{
+  "version": 1,
+  "project": "City Expansion Sim",
+  "overview": "Advance the simulation from deterministic pressure maps into richer district strategy, scenario comparison, and workflow automation while preserving prstack as the operating surface.",
+  "goals": [
+    "Add district strategy layers that make scenarios diverge in more meaningful ways",
+    "Expose simulation comparison and replay views in the frontend",
+    "Keep Ralph loop usage bounded and gated by prstack review and qa"
+  ],
+  "nonGoals": [
+    "No production deployment automation yet",
+    "No remote PR automation until the repository has a real remote workflow"
+  ],
+  "successMetrics": [
+    "A single bounded Ralph iteration can complete one self-contained story and pass prstack review/qa",
+    "The frontend can compare at least two saved or replayed simulation states",
+    "District strategies materially alter simulation metrics and reports"
+  ],
+  "openQuestions": [
+    "Should the long-term world model stay tile-first or move to district-first with tile overlays?"
+  ],
+  "stack": {
+    "backend": "Flask + Python 3.12",
+    "frontend": "Vue 3 + Vite + TypeScript",
+    "simulation": "Custom deterministic engine with replay and persistence",
+    "workflow": "prstack with Ralph loop integration"
+  },
+  "routes": [
+    {
+      "path": "/",
+      "name": "Simulation Console",
+      "purpose": "Run scenarios, interventions, saves, and replay"
+    }
+  ],
+  "uiNotes": [
+    "Keep the current bold editorial visual style",
+    "Do not regress save/load, replay rail, or intervention controls"
+  ],
+  "dataModel": [
+    {
+      "entity": "Scenario",
+      "fields": [
+        "id",
+        "agentProfiles",
+        "events",
+        "cells"
+      ]
+    },
+    {
+      "entity": "Session",
+      "fields": [
+        "sessionId",
+        "snapshot",
+        "history",
+        "saves"
+      ]
+    }
+  ],
+  "importFormat": {
+    "description": "Scenario JSON files under simulation/scenarios",
+    "example": {
+      "id": "metro_delta_arc",
+      "agentProfiles": {},
+      "events": []
+    }
+  },
+  "rules": [
+    "Run bounded Ralph iterations only",
+    "Every story must pass prstack review and prstack qa"
+  ],
+  "qualityGates": [
+    "./ops/prstack/bin/prstack review",
+    "./ops/prstack/bin/prstack qa"
+  ],
+  "stories": [
+    {
+      "id": "US-001",
+      "title": "Add district strategy modifiers",
+      "status": "done",
+      "dependsOn": [],
+      "description": "As a planner, I want districts to have explicit strategy modes so different districts evolve in distinct ways.",
+      "acceptanceCriteria": [
+        "Add district-level strategy definitions that affect runtime behavior beyond generic pressure scalars",
+        "Example: a growth-first district increases access or land value growth more aggressively than a resilience-first district",
+        "Negative case: a district without a strategy still runs using safe defaults",
+        "Update backend tests to cover the new strategy behavior",
+        "Run ./ops/prstack/bin/prstack review and ./ops/prstack/bin/prstack qa"
+      ],
+      "startedAt": "2026-03-17T10:31:45.882113+00:00",
+      "completedAt": "2026-03-17T10:35:11.517215+00:00",
+      "updatedAt": "2026-03-17T10:35:11.517200+00:00"
+    },
+    {
+      "id": "US-002",
+      "title": "Build state comparison panel",
+      "status": "open",
+      "dependsOn": [
+        "US-001"
+      ],
+      "description": "As a user, I want to compare replay or saved states so I can see what changed between two points in time.",
+      "acceptanceCriteria": [
+        "Add a frontend comparison panel for at least two replayed or saved states",
+        "Example: compare tick 0 vs tick 4 and show differences in population, land value, and urban cells",
+        "Negative case: when fewer than two states are selected, the comparison panel should not crash and should show a clear empty state",
+        "If new UI logic is added, keep npm run build passing",
+        "Run ./ops/prstack/bin/prstack review and ./ops/prstack/bin/prstack qa"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Add bounded Ralph loop reporting into prstack",
+      "status": "open",
+      "dependsOn": [],
+      "description": "As a developer, I want prstack loop runs to record Ralph outputs in a predictable place so autonomous iterations stay inspectable.",
+      "acceptanceCriteria": [
+        "Persist Ralph loop summaries or references under ops/prstack/state/reports or a clearly linked location",
+        "Example: a no-commit Ralph run records which story was selected and where logs were written",
+        "Negative case: if Ralph is unavailable or fails, prstack reports the error without corrupting workflow state",
+        "Keep Ralph loop execution bounded",
+        "Run ./ops/prstack/bin/prstack review and ./ops/prstack/bin/prstack qa"
+      ]
+    }
+  ]
+}

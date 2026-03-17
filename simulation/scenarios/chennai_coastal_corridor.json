@@ -16,6 +16,12 @@
     "developers": { "capitalAggression": 1.02, "speculation": 1.06 },
     "government": { "deliveryBias": 1.05, "coordination": 1.03 }
   },
+  "districtStrategies": {
+    "Tech Spine": { "mode": "growth_first" },
+    "Outer Growth": { "mode": "growth_first" },
+    "Floodplain": { "mode": "resilience_first" },
+    "Reserve Belt": { "mode": "resilience_first" }
+  },
   "events": [
     {
       "tick": 2,

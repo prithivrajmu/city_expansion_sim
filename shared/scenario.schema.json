@@ -40,6 +40,25 @@
         "government": { "type": "object" }
       }
     },
+    "districtStrategies": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": ["balanced", "growth_first", "resilience_first"]
+          },
+          "growth_signal_bias": { "type": "number" },
+          "conversion_threshold_delta": { "type": "number" },
+          "access_drift": { "type": "number" },
+          "land_value_multiplier": { "type": "number" },
+          "population_multiplier": { "type": "number" },
+          "risk_drift": { "type": "number" },
+          "risk_weight": { "type": "number" }
+        }
+      }
+    },
     "events": {
       "type": "array",
       "items": {

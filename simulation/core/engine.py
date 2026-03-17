@@ -4,6 +4,41 @@ import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+DEFAULT_DISTRICT_STRATEGY = {
+    "mode": "balanced",
+    "growth_signal_bias": 0.0,
+    "conversion_threshold_delta": 0.0,
+    "access_drift": 0.0,
+    "land_value_multiplier": 1.0,
+    "population_multiplier": 1.0,
+    "risk_drift": 0.0,
+    "risk_weight": 1.0,
+}
+
+DISTRICT_STRATEGY_PRESETS = {
+    "balanced": DEFAULT_DISTRICT_STRATEGY,
+    "growth_first": {
+        "mode": "growth_first",
+        "growth_signal_bias": 0.16,
+        "conversion_threshold_delta": -0.08,
+        "access_drift": 0.035,
+        "land_value_multiplier": 1.35,
+        "population_multiplier": 1.12,
+        "risk_drift": 0.012,
+        "risk_weight": 0.9,
+    },
+    "resilience_first": {
+        "mode": "resilience_first",
+        "growth_signal_bias": -0.08,
+        "conversion_threshold_delta": 0.05,
+        "access_drift": 0.015,
+        "land_value_multiplier": 0.9,
+        "population_multiplier": 0.94,
+        "risk_drift": -0.03,
+        "risk_weight": 1.15,
+    },
+}
+
 
 @dataclass
 class CellSnapshot:
@@ -47,6 +82,7 @@ class Scenario:
     agentProfiles: dict
     events: list[dict]
     cells: list[dict]
+    districtStrategies: dict[str, dict] | None = None
 
 
 @dataclass
@@ -74,7 +110,6 @@ class SimulationSession:
 
     def tick(self) -> None:
         width = self.scenario.gridWidth
-        threshold = 1.2 - self.scenario.policyBoost
         resident_pressure = self._resident_pressure()
         developer_pressure = self._developer_pressure()
         government_pressure = self._government_pressure()
@@ -83,6 +118,7 @@ class SimulationSession:
         conversions = 0
 
         for index, cell in enumerate(self.cells):
+            strategy = self._district_strategy(cell["district"])
             urban_neighbors = self._urban_neighbor_ratio(index, width)
             growth_signal = (
                 urban_neighbors * 0.8
@@ -90,21 +126,35 @@ class SimulationSession:
                 + resident_pressure * 0.4
                 + developer_pressure * 0.35
                 + government_pressure * 0.2
-                - cell["risk"] * 0.55
+                + strategy["growth_signal_bias"]
+                - cell["risk"] * 0.55 * strategy["risk_weight"]
             )
+            threshold = 1.2 - self.scenario.policyBoost + strategy["conversion_threshold_delta"]
 
             next_cell = cell.copy()
+            if cell["kind"] != "water":
+                next_cell["access"] = self._clamp(cell["access"] + strategy["access_drift"])
+                next_cell["risk"] = self._clamp(cell["risk"] + strategy["risk_drift"])
             if not cell["urbanized"] and cell["kind"] != "water" and growth_signal >= threshold:
                 next_cell["urbanized"] = True
                 next_cell["kind"] = "urban"
-                next_cell["population"] += 120
-                next_cell["landValue"] += 80
+                next_cell["population"] += self._scaled_value(120, strategy["population_multiplier"])
+                next_cell["landValue"] += self._scaled_value(80, strategy["land_value_multiplier"])
                 conversions += 1
             elif cell["urbanized"]:
-                next_cell["population"] += int(18 + (cell["access"] * 12) - (cell["risk"] * 6))
-                next_cell["landValue"] += int(12 + (urban_neighbors * 10))
+                next_cell["population"] += self._scaled_value(
+                    18 + (next_cell["access"] * 12) - (next_cell["risk"] * 6),
+                    strategy["population_multiplier"],
+                )
+                next_cell["landValue"] += self._scaled_value(
+                    12 + (urban_neighbors * 10),
+                    strategy["land_value_multiplier"],
+                )
             else:
-                next_cell["landValue"] += int(2 + (cell["access"] * 4) - (cell["risk"] * 2))
+                next_cell["landValue"] += self._scaled_value(
+                    2 + (next_cell["access"] * 4) - (next_cell["risk"] * 2),
+                    strategy["land_value_multiplier"],
+                )
 
             next_cells.append(next_cell)
 
@@ -250,6 +300,24 @@ class SimulationSession:
     def _government_pressure(self) -> float:
         profile = self.scenario.agentProfiles.get("government", {})
         return round(self.scenario.policyBoost * profile.get("deliveryBias", 1.0) * profile.get("coordination", 1.0), 3)
+
+    def _district_strategy(self, district: str) -> dict:
+        definition = (self.scenario.districtStrategies or {}).get(district, {})
+        mode = definition.get("mode", "balanced")
+        preset = DISTRICT_STRATEGY_PRESETS.get(mode, DEFAULT_DISTRICT_STRATEGY)
+        strategy = preset.copy()
+        for key in DEFAULT_DISTRICT_STRATEGY:
+            if key == "mode":
+                continue
+            if key in definition:
+                strategy[key] = definition[key]
+        return strategy
+
+    def _clamp(self, value: float) -> float:
+        return min(1.0, max(0.0, round(value, 3)))
+
+    def _scaled_value(self, base: float, multiplier: float) -> int:
+        return int(round(base * multiplier))
 
     def _apply_scheduled_events(self) -> None:
         next_tick = self.tick_count + 1

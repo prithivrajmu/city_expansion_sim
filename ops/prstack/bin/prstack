@@ -29,6 +29,8 @@ Usage:
   prstack dev
   prstack plan "Title"
   prstack slice "Title"
+  prstack ralph-ping
+  prstack loop [n] [--no-commit]
   prstack review
   prstack qa
   prstack ship
@@ -88,6 +90,17 @@ install() {
   (cd "${ROOT_DIR}" && npm run setup:all)
 }
 
+ensure_ralph() {
+  if [[ ! -x "${ROOT_DIR}/node_modules/.bin/ralph" ]]; then
+    printf 'Ralph is not installed locally. Run prstack install or npm install.\n' >&2
+    exit 1
+  fi
+  if [[ ! -f "${ROOT_DIR}/.agents/ralph/loop.sh" ]]; then
+    printf 'Ralph templates are missing from .agents/ralph.\n' >&2
+    exit 1
+  fi
+}
+
 dev() {
   bootstrap
 
@@ -97,6 +110,12 @@ dev() {
   fi
 
   (cd "${ROOT_DIR}" && npm run dev)
+}
+
+ralph_ping() {
+  bootstrap >/dev/null
+  ensure_ralph
+  (cd "${ROOT_DIR}" && npx ralph ping --agent=codex)
 }
 
 plan() {
@@ -233,6 +252,29 @@ EOF
   [[ "${api_status}" == "pass" ]]
 }
 
+loop() {
+  bootstrap >/dev/null
+  ensure_ralph
+  local iterations="1"
+  local no_commit=""
+
+  if [[ $# -ge 1 && "$1" =~ ^[0-9]+$ ]]; then
+    iterations="$1"
+    shift
+  fi
+
+  if [[ "${1:-}" == "--no-commit" ]]; then
+    no_commit="--no-commit"
+  fi
+
+  printf 'Running Ralph loop for %s iteration(s)%s\n' "${iterations}" "${no_commit:+ (no commit)}"
+  (cd "${ROOT_DIR}" && npx ralph build "${iterations}" --agent=codex ${no_commit})
+
+  review
+  qa
+  handoff
+}
+
 handoff() {
   bootstrap >/dev/null
   local title
@@ -317,6 +359,13 @@ main() {
     slice)
       shift
       slice "${*:-Implementation Slice}"
+      ;;
+    ralph-ping)
+      ralph_ping
+      ;;
+    loop)
+      shift
+      loop "$@"
       ;;
     review)
       review

@@ -22,5 +22,5 @@
 health ok
 scenario count 2
 tick 3
-headline Metro Delta Arc at year 2026 has 25 urban cells and population 7520.
+headline Metro Delta Arc at year 2026 has 26 urban cells and population 7837.
 ```

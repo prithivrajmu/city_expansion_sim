@@ -3,6 +3,7 @@ frontend/node_modules/
 backend/.venv/
 frontend/dist/
 simulation/saves/*.json
+.ralph/
 __pycache__/
 *.pyc
 .DS_Store
