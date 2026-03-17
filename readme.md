@@ -68,6 +68,8 @@ Use the workflow stack with:
 
 ```bash
 ./ops/prstack/bin/prstack plan "Intervention Slice"
+./ops/prstack/bin/prstack ceo-review
+./ops/prstack/bin/prstack security-review
 ./ops/prstack/bin/prstack review
 ./ops/prstack/bin/prstack qa
 ./ops/prstack/bin/prstack ship

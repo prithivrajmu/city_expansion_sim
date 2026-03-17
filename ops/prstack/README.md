@@ -24,6 +24,8 @@ From the repo root:
 ./ops/prstack/bin/prstack slice "Intervention Slice"
 ./ops/prstack/bin/prstack ralph-ping
 ./ops/prstack/bin/prstack loop 1 --no-commit
+./ops/prstack/bin/prstack ceo-review
+./ops/prstack/bin/prstack security-review
 ./ops/prstack/bin/prstack review
 ./ops/prstack/bin/prstack qa
 ./ops/prstack/bin/prstack ship
@@ -37,9 +39,11 @@ From the repo root:
 - `slice` creates a named slice record and makes it current
 - `ralph-ping` smoke-checks the local Ralph + Codex runner
 - `loop` runs bounded Ralph build iterations, then returns through `review`, `qa`, and `handoff`
+- `ceo-review` writes a product/founder review against the current slice
+- `security-review` writes a deployment-risk review against the current stack
 - `review` runs the automated build-and-test review gate
 - `qa` runs API and simulation smoke verification
-- `ship` bundles review, QA, and handoff into a local release packet
+- `ship` bundles review, QA, CEO review, security review, and handoff into a local release packet
 - `handoff` writes the current transfer summary
 
 ## Notes
@@ -49,3 +53,4 @@ From the repo root:
 - if you later want a richer workflow, we can add JSON schemas, branch helpers, or PR summaries
 - `prstack dev` is the intended autorun entrypoint for local development
 - Ralph is integrated as a bounded loop runner inside `prstack`, not as a replacement workflow
+- specialist guidance now lives inside the stack instead of staying implicit in ad hoc prompts

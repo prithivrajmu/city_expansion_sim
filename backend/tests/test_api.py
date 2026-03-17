@@ -81,6 +81,9 @@ def test_session_tick_command_and_report_flow():
     assert "headline" in report
     assert len(report["growthFrontier"]) == 3
     assert "agentSummary" in report
+    assert "comparison" in report
+    assert "districtComparison" in report
+    assert "interventionROI" in report
 
 
 def test_save_load_and_replay_flow():
@@ -114,6 +117,7 @@ def test_save_load_and_replay_flow():
     assert load_response.status_code == 201
     loaded = load_response.get_json()
     assert loaded["snapshot"]["tick"] == 3
+    assert "path" not in saves_response.get_json()["items"][0]
 
 
 def test_scenario_events_affect_runtime_state():
@@ -164,3 +168,34 @@ def test_district_without_strategy_uses_safe_defaults():
     assert unconfigured_resilience["landValue"] == baseline_resilience["landValue"]
     assert unconfigured_resilience["population"] == baseline_resilience["population"]
     assert unconfigured_resilience["risk"] == baseline_resilience["risk"]
+
+
+def test_invalid_scenario_id_returns_404():
+    client = app.test_client()
+    response = client.post("/sessions", json={"scenarioId": "../missing"})
+    assert response.status_code == 404
+    assert response.get_json()["error"] == "not_found"
+
+
+def test_invalid_save_id_returns_404():
+    client = app.test_client()
+    response = client.post("/saves/not-a-real-save/load")
+    assert response.status_code == 404
+    assert response.get_json()["error"] == "not_found"
+
+
+def test_report_exposes_baseline_deltas_and_intervention_roi():
+    client = app.test_client()
+    create_response = client.post("/sessions", json={"scenarioId": "metro_delta_arc"})
+    session_id = create_response.get_json()["sessionId"]
+
+    client.post(
+        f"/sessions/{session_id}/commands",
+        json={"type": "build_transit", "district": "Outer Arc", "strength": 0.12},
+    )
+    client.post(f"/sessions/{session_id}/tick", json={"steps": 2})
+
+    report = client.get(f"/sessions/{session_id}/report").get_json()
+    assert report["comparison"]["currentTick"] == 2
+    assert any(item["district"] == "Outer Arc" for item in report["districtComparison"])
+    assert any(item["type"] == "build_transit" for item in report["interventionROI"])

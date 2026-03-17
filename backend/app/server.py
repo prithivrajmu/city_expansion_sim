@@ -9,6 +9,21 @@ app = Flask(__name__)
 CORS(app)
 
 
+@app.errorhandler(KeyError)
+def handle_missing_key(error: KeyError):
+    return jsonify({"error": "not_found", "message": str(error)}), 404
+
+
+@app.errorhandler(FileNotFoundError)
+def handle_missing_file(error: FileNotFoundError):
+    return jsonify({"error": "not_found", "message": str(error)}), 404
+
+
+@app.errorhandler(ValueError)
+def handle_bad_request(error: ValueError):
+    return jsonify({"error": "bad_request", "message": str(error)}), 400
+
+
 @app.get("/health")
 def health() -> tuple[dict[str, str], int]:
     return {"status": "ok"}, 200

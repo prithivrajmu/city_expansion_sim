@@ -435,12 +435,14 @@ class SimulationSession:
 
     def report(self) -> dict:
         metrics = self._metrics()
+        baseline_entry = self.history[0] if self.history else None
         fastest_growth = sorted(
             self.cells,
             key=lambda cell: (cell["urbanized"], cell["access"], cell["landValue"]),
             reverse=True,
         )[:3]
         risk_zones = sorted(self.cells, key=lambda cell: cell["risk"], reverse=True)[:3]
+        comparison = self._comparison_metrics(baseline_entry)
         return {
             "headline": (
                 f"{self.scenario.name} at year {self._current_year()} has "
@@ -451,6 +453,7 @@ class SimulationSession:
                 f"Average infrastructure access is {metrics['averageAccess']} and average risk is {metrics['averageRisk']}.",
                 f"{metrics['interventionCount']} interventions have been applied in this session.",
                 f"Resident pressure is {metrics['residentPressure']}, developer pressure is {metrics['developerPressure']}, and government pressure is {metrics['governmentPressure']}.",
+                f"Compared with baseline, population changed by {comparison['populationDelta']} and average land value changed by {comparison['averageLandValueDelta']}.",
             ],
             "growthFrontier": [
                 {
@@ -474,7 +477,123 @@ class SimulationSession:
             "recentEvents": list(self.events[-5:]),
             "timeline": [asdict(entry) for entry in self.timeline()],
             "agentSummary": self.scenario.agentProfiles,
+            "comparison": comparison,
+            "districtComparison": self._district_comparison(baseline_entry),
+            "interventionROI": self._intervention_roi(),
         }
+
+    def _comparison_metrics(self, baseline_entry: dict | None) -> dict:
+        current = self._metrics()
+        if not baseline_entry:
+            return {
+                "baselineTick": 0,
+                "currentTick": self.tick_count,
+                "populationDelta": 0,
+                "urbanCellsDelta": 0,
+                "averageLandValueDelta": 0,
+                "averageRiskDelta": 0.0,
+                "averageAccessDelta": 0.0,
+            }
+
+        baseline_metrics = baseline_entry["metrics"]
+        return {
+            "baselineTick": baseline_entry["tick"],
+            "currentTick": self.tick_count,
+            "populationDelta": current["population"] - baseline_metrics["population"],
+            "urbanCellsDelta": current["urbanCells"] - baseline_metrics["urbanCells"],
+            "averageLandValueDelta": current["averageLandValue"] - baseline_metrics["averageLandValue"],
+            "averageRiskDelta": round(current["averageRisk"] - baseline_metrics["averageRisk"], 3),
+            "averageAccessDelta": round(current["averageAccess"] - baseline_metrics["averageAccess"], 3),
+        }
+
+    def _district_comparison(self, baseline_entry: dict | None) -> list[dict]:
+        current_by_district = self._district_metrics(self.cells)
+        baseline_by_district = self._district_metrics(baseline_entry["cells"]) if baseline_entry else {}
+        items: list[dict] = []
+        for district in sorted(current_by_district):
+            current = current_by_district[district]
+            baseline = baseline_by_district.get(
+                district,
+                {
+                    "population": 0,
+                    "landValue": 0,
+                    "risk": 0.0,
+                    "access": 0.0,
+                    "urbanCells": 0,
+                },
+            )
+            items.append(
+                {
+                    "district": district,
+                    "populationDelta": current["population"] - baseline["population"],
+                    "landValueDelta": current["landValue"] - baseline["landValue"],
+                    "riskDelta": round(current["risk"] - baseline["risk"], 3),
+                    "accessDelta": round(current["access"] - baseline["access"], 3),
+                    "urbanCellsDelta": current["urbanCells"] - baseline["urbanCells"],
+                }
+            )
+        return items
+
+    def _district_metrics(self, cells: list[dict]) -> dict[str, dict]:
+        district_data: dict[str, dict] = {}
+        district_counts: dict[str, int] = {}
+        for cell in cells:
+            if cell["kind"] == "water":
+                continue
+            district = cell["district"]
+            district_data.setdefault(
+                district,
+                {"population": 0, "landValue": 0, "risk": 0.0, "access": 0.0, "urbanCells": 0},
+            )
+            district_counts[district] = district_counts.get(district, 0) + 1
+            district_data[district]["population"] += cell["population"]
+            district_data[district]["landValue"] += cell["landValue"]
+            district_data[district]["risk"] += cell["risk"]
+            district_data[district]["access"] += cell["access"]
+            district_data[district]["urbanCells"] += 1 if cell["urbanized"] else 0
+
+        for district, totals in district_data.items():
+            count = max(1, district_counts[district])
+            totals["risk"] = round(totals["risk"] / count, 3)
+            totals["access"] = round(totals["access"] / count, 3)
+        return district_data
+
+    def _intervention_roi(self) -> list[dict]:
+        items: list[dict] = []
+        for intervention in self.interventions:
+            before_entry = self._history_entry(intervention["tick"])
+            district = intervention["district"]
+            current_metrics = self._district_metrics(self.cells)
+            before_metrics = self._district_metrics(before_entry["cells"]) if before_entry else {}
+            current = current_metrics.get(district)
+            previous = before_metrics.get(
+                district,
+                {"population": 0, "landValue": 0, "risk": 0.0, "access": 0.0, "urbanCells": 0},
+            )
+            if not current:
+                continue
+            denominator = max(1.0, intervention["strength"] * max(1, intervention["touched"]) * 100)
+            value_gain = current["landValue"] - previous["landValue"]
+            population_gain = current["population"] - previous["population"]
+            risk_delta = round(current["risk"] - previous["risk"], 3)
+            items.append(
+                {
+                    "type": intervention["type"],
+                    "district": district,
+                    "tick": intervention["tick"],
+                    "valueGain": value_gain,
+                    "populationGain": population_gain,
+                    "riskDelta": risk_delta,
+                    "efficiency": round(value_gain / denominator, 3),
+                }
+            )
+        return items
+
+    def _history_entry(self, tick: int) -> dict | None:
+        for entry in self.history:
+            if entry["tick"] == tick:
+                return entry
+        return None
 
 
 def create_session_from_scenario(path: Path) -> SimulationSession:

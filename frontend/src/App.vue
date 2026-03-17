@@ -13,7 +13,6 @@ type SaveItem = {
   saveId: string;
   scenarioId: string;
   tick: number;
-  path: string;
 };
 
 type Intervention = {
@@ -98,6 +97,32 @@ type Report = {
     developers: Record<string, number>;
     government: Record<string, number>;
   };
+  comparison: {
+    baselineTick: number;
+    currentTick: number;
+    populationDelta: number;
+    urbanCellsDelta: number;
+    averageLandValueDelta: number;
+    averageRiskDelta: number;
+    averageAccessDelta: number;
+  };
+  districtComparison: Array<{
+    district: string;
+    populationDelta: number;
+    landValueDelta: number;
+    riskDelta: number;
+    accessDelta: number;
+    urbanCellsDelta: number;
+  }>;
+  interventionROI: Array<{
+    type: string;
+    district: string;
+    tick: number;
+    valueGain: number;
+    populationGain: number;
+    riskDelta: number;
+    efficiency: number;
+  }>;
 };
 
 const apiBase = "http://localhost:5001";
@@ -141,6 +166,8 @@ const metricCards = computed(() => {
 });
 
 const districtOptions = computed(() => session.value?.snapshot.districts ?? []);
+const topDistrictDeltas = computed(() => report.value?.districtComparison.slice(0, 4) ?? []);
+const topInterventionROI = computed(() => report.value?.interventionROI.slice().reverse().slice(0, 4) ?? []);
 
 async function fetchScenarios() {
   const response = await fetch(`${apiBase}/scenarios`);
@@ -307,6 +334,10 @@ function commandLabel(command: string) {
   return command.replaceAll("_", " ");
 }
 
+function formatSigned(value: number) {
+  return value > 0 ? `+${value}` : `${value}`;
+}
+
 watch(replayTick, async (value) => {
   await fetchReplay(value);
 });
@@ -438,6 +469,41 @@ onMounted(async () => {
           </p>
         </div>
 
+        <div v-if="report" class="panel">
+          <div class="panel-header">
+            <div>
+              <p class="panel-kicker">Comparison</p>
+              <h2>Baseline vs Run</h2>
+            </div>
+          </div>
+          <div class="metrics comparison-metrics">
+            <article class="metric-card">
+              <span>Population Delta</span>
+              <strong>{{ formatSigned(report.comparison.populationDelta) }}</strong>
+            </article>
+            <article class="metric-card">
+              <span>Urban Cells Delta</span>
+              <strong>{{ formatSigned(report.comparison.urbanCellsDelta) }}</strong>
+            </article>
+            <article class="metric-card">
+              <span>Land Value Delta</span>
+              <strong>{{ formatSigned(report.comparison.averageLandValueDelta) }}</strong>
+            </article>
+            <article class="metric-card">
+              <span>Access / Risk</span>
+              <strong>
+                {{ formatSigned(report.comparison.averageAccessDelta) }} / {{ formatSigned(report.comparison.averageRiskDelta) }}
+              </strong>
+            </article>
+          </div>
+          <ul class="event-list compact-list">
+            <li v-for="item in topDistrictDeltas" :key="item.district">
+              {{ item.district }} | pop {{ formatSigned(item.populationDelta) }} | value {{ formatSigned(item.landValueDelta) }} |
+              urban {{ formatSigned(item.urbanCellsDelta) }}
+            </li>
+          </ul>
+        </div>
+
         <div class="panel">
           <div class="panel-header">
             <div>
@@ -470,6 +536,16 @@ onMounted(async () => {
               {{ commandLabel(entry.type) }} in {{ entry.district }} at tick {{ entry.tick }}
             </li>
           </ul>
+
+          <div v-if="report && topInterventionROI.length > 0">
+            <p class="mini-heading">Intervention ROI</p>
+            <ul class="event-list compact-list">
+              <li v-for="entry in topInterventionROI" :key="`${entry.tick}-${entry.type}-${entry.district}-roi`">
+                {{ commandLabel(entry.type) }} | {{ entry.district }} | value {{ formatSigned(entry.valueGain) }} |
+                pop {{ formatSigned(entry.populationGain) }} | eff {{ entry.efficiency }}
+              </li>
+            </ul>
+          </div>
         </div>
 
         <div class="panel">

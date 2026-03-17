@@ -31,6 +31,8 @@ Usage:
   prstack slice "Title"
   prstack ralph-ping
   prstack loop [n] [--no-commit]
+  prstack ceo-review
+  prstack security-review
   prstack review
   prstack qa
   prstack ship
@@ -62,6 +64,14 @@ bootstrap() {
     render_template "${TEMPLATE_DIR}/qa.md" "${REPORT_DIR}/qa.md"
   fi
 
+  if [[ ! -f "${REPORT_DIR}/ceo-review.md" ]]; then
+    render_template "${TEMPLATE_DIR}/ceo-review.md" "${REPORT_DIR}/ceo-review.md"
+  fi
+
+  if [[ ! -f "${REPORT_DIR}/security-review.md" ]]; then
+    render_template "${TEMPLATE_DIR}/security-review.md" "${REPORT_DIR}/security-review.md"
+  fi
+
   if [[ ! -f "${REPORT_DIR}/handoff.md" ]]; then
     render_template "${TEMPLATE_DIR}/handoff.md" "${REPORT_DIR}/handoff.md"
   fi
@@ -78,6 +88,8 @@ status() {
   printf 'Current Slice: %s\n' "${STATE_DIR}/current-slice.md"
   printf 'Review Report: %s\n' "${REPORT_DIR}/review.md"
   printf 'QA Report: %s\n' "${REPORT_DIR}/qa.md"
+  printf 'CEO Review: %s\n' "${REPORT_DIR}/ceo-review.md"
+  printf 'Security Review: %s\n' "${REPORT_DIR}/security-review.md"
   printf 'Handoff: %s\n' "${REPORT_DIR}/handoff.md"
 
   if [[ -f "${STATE_DIR}/tasks.md" ]]; then
@@ -252,6 +264,95 @@ EOF
   [[ "${api_status}" == "pass" ]]
 }
 
+ceo_review() {
+  bootstrap >/dev/null
+  cat > "${REPORT_DIR}/ceo-review.md" <<EOF
+# CEO Review
+
+## Date
+
+${NOW}
+
+## Product Position
+
+- The sim has a working city-systems sandbox with scenarios, interventions, replay, save/load, and reports.
+- The current experience is still a systems demo, not yet a sticky strategy product loop.
+- The strongest product angle is "urban strategy lab": compare policy choices, district strategies, and long-horizon tradeoffs.
+
+## What Is Working
+
+- Fast setup through \`prstack dev\`
+- Clear simulation verbs: transit, upzoning, flood barriers
+- Scenario-driven structure with event timelines
+- Replay and save/load strong enough for experimentation
+
+## Missing To Reach A Real Product
+
+- No explicit win/loss or score model for player decisions
+- No side-by-side comparison run for "what changed because of my intervention"
+- No budget, political capital, or resource constraints on commands
+- No campaign or scenario progression that teaches the system over time
+- Long-term world model is still unresolved: district abstraction works, but tile or hybrid detail is still undecided
+
+## Direction
+
+- Keep the district model as the shipping core and defer tile detail until a stronger game loop exists
+- Build a comparison panel next: baseline versus current run, delta by district, and intervention ROI
+- Add resource constraints so each intervention becomes a tradeoff instead of a free action
+- Introduce scenario objectives and failure pressure so reports become decisions, not just telemetry
+
+## Immediate Priorities
+
+- Build baseline-vs-run comparison UX and API output
+- Add budget and policy-capital costs to interventions
+- Define scenario objectives, success metrics, and end-of-horizon evaluation
+- Decide whether district-only remains the production model or becomes a layer over future tiles
+EOF
+
+  printf 'Wrote CEO review: %s\n' "${REPORT_DIR}/ceo-review.md"
+}
+
+security_review() {
+  bootstrap >/dev/null
+  cat > "${REPORT_DIR}/security-review.md" <<EOF
+# Security Review
+
+## Date
+
+${NOW}
+
+## Overall Assessment
+
+- Current risk posture: prototype-grade
+- Main exposure is backend trust of user input rather than infrastructure complexity
+
+## Findings
+
+- High: scenario and save identifiers are user-controlled entry points and must be strictly validated to avoid path traversal and unexpected file access
+- High: the API is fully unauthenticated and CORS-open, which is fine for local development but not safe for any shared or hosted deployment
+- Medium: save listings expose internal filesystem paths, which leaks host layout without product value
+- Medium: session growth is unbounded in memory, so repeated session creation can become a denial-of-service vector
+- Medium: error handling is inconsistent, so malformed input can surface framework exceptions instead of controlled API responses
+
+## Guidance
+
+- Keep local-dev defaults, but add explicit production guards before any public deployment
+- Treat scenario ids, save ids, and command payloads as schema-validated inputs rather than trusted strings
+- Stop returning host paths in public payloads unless an internal tool genuinely needs them
+- Add bounded in-memory session retention or persistence-backed eviction
+- Add structured 4xx responses for invalid session ids, ticks, commands, and save ids
+
+## Next Security Work
+
+- Add input validation and normalized error responses across the API
+- Add a deployment mode with restricted CORS and basic auth/session protection
+- Add rate limiting or session caps before exposing the backend outside localhost
+- Add schema validation for command payloads and save labels
+EOF
+
+  printf 'Wrote security review: %s\n' "${REPORT_DIR}/security-review.md"
+}
+
 loop() {
   bootstrap >/dev/null
   ensure_ralph
@@ -272,6 +373,8 @@ loop() {
 
   review
   qa
+  ceo_review
+  security_review
   handoff
 }
 
@@ -294,6 +397,8 @@ ${title}
 
 - Review report refreshed at \`${REPORT_DIR}/review.md\`
 - QA report refreshed at \`${REPORT_DIR}/qa.md\`
+- CEO review refreshed at \`${REPORT_DIR}/ceo-review.md\`
+- Security review refreshed at \`${REPORT_DIR}/security-review.md\`
 - Current slice tracked at \`${STATE_DIR}/current-slice.md\`
 
 ## Next
@@ -301,6 +406,7 @@ ${title}
 - Continue the active slice or open a new one with \`prstack slice "Title"\`
 - Use \`prstack review\` before structural merges
 - Use \`prstack qa\` after simulation or API changes
+- Use \`prstack ceo-review\` and \`prstack security-review\` to keep product and risk guidance current
 
 ## Risks
 
@@ -314,6 +420,8 @@ ship() {
   bootstrap >/dev/null
   review
   qa
+  ceo_review
+  security_review
   handoff
   cat > "${REPORT_DIR}/ship.md" <<EOF
 # Ship Report
@@ -326,6 +434,8 @@ ${NOW}
 
 - review completed
 - qa completed
+- ceo review completed
+- security review completed
 - handoff prepared
 
 ## Notes
@@ -372,6 +482,12 @@ main() {
       ;;
     qa)
       qa
+      ;;
+    ceo-review)
+      ceo_review
+      ;;
+    security-review)
+      security_review
       ;;
     ship)
       ship

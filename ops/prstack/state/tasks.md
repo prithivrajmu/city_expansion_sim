@@ -9,4 +9,9 @@
 - [ ] Decide tile-based versus district-based long-term world model
 - [x] Add save/load sessions and replay support
 - [x] Add richer agent groups beyond the deterministic corridor model
+- [ ] Add baseline-vs-run comparison views and intervention ROI reporting
+- [ ] Add budget and policy-capital constraints to interventions
+- [ ] Harden scenario/save input validation and normalize API error responses
+- [ ] Add bounded session retention or persistence-backed eviction
 - [ ] Add git-aware ship automation when this project becomes a real git repo
+- [ ] Extract `prstack` into a standalone publishable Codex workflow repo with optional Ralph integration

@@ -31,10 +31,10 @@ transforming...
 rendering chunks...
 computing gzip size...
 dist/index.html                  0.70 kB │ gzip:  0.39 kB
-dist/assets/index-DZPYDcyX.css   4.16 kB │ gzip:  1.48 kB
-dist/assets/index-B9PxQ7XC.js   74.33 kB │ gzip: 28.42 kB
-✓ built in 687ms
+dist/assets/index-D907mNf2.css   4.20 kB │ gzip:  1.50 kB
+dist/assets/index-Cszc8SDG.js   76.08 kB │ gzip: 28.77 kB
+✓ built in 717ms
 
-......                                                                   [100%]
-6 passed in 0.13s
+.........                                                                [100%]
+9 passed in 0.17s
 ```

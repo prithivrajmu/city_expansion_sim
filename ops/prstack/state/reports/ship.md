@@ -8,6 +8,8 @@
 
 - review completed
 - qa completed
+- ceo review completed
+- security review completed
 - handoff prepared
 
 ## Notes

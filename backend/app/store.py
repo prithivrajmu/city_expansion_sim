@@ -52,8 +52,9 @@ class SessionStore:
         return items
 
     def create_session(self, scenario_id: str) -> SessionEnvelope:
+        scenario_path = self._scenario_path(scenario_id)
         session_id = str(uuid.uuid4())
-        session = create_session_from_scenario(SCENARIOS_DIR / f"{scenario_id}.json")
+        session = create_session_from_scenario(scenario_path)
         self._sessions[session_id] = session
         return SessionEnvelope(session_id=session_id, scenario_id=scenario_id, snapshot=session.snapshot())
 
@@ -89,7 +90,7 @@ class SessionStore:
     def save_session(self, session_id: str, label: str | None = None) -> dict:
         session = self._sessions[session_id]
         save_id = label or f"{session.scenario.id}-tick-{session.tick_count}"
-        safe_id = "".join(char if char.isalnum() or char in {"-", "_"} else "-" for char in save_id).strip("-")
+        safe_id = self._normalize_identifier(save_id)
         path = SAVES_DIR / f"{safe_id}.json"
         payload = {
             "saveId": safe_id,
@@ -99,7 +100,7 @@ class SessionStore:
         }
         with path.open("w", encoding="utf-8") as handle:
             json.dump(payload, handle, indent=2)
-        return {"saveId": safe_id, "path": str(path), "tick": session.tick_count, "scenarioId": session.scenario.id}
+        return {"saveId": safe_id, "tick": session.tick_count, "scenarioId": session.scenario.id}
 
     def list_saves(self) -> list[dict]:
         items: list[dict] = []
@@ -111,19 +112,32 @@ class SessionStore:
                     "saveId": payload["saveId"],
                     "scenarioId": payload["scenarioId"],
                     "tick": payload["state"]["tickCount"],
-                    "path": str(path),
                 }
             )
         return items
 
     def load_save(self, save_id: str) -> SessionEnvelope:
-        path = SAVES_DIR / f"{save_id}.json"
+        safe_id = self._normalize_identifier(save_id)
+        path = SAVES_DIR / f"{safe_id}.json"
         with path.open("r", encoding="utf-8") as handle:
             payload = json.load(handle)
         session_id = str(uuid.uuid4())
         session = SimulationSession.from_state(payload["state"])
         self._sessions[session_id] = session
         return SessionEnvelope(session_id=session_id, scenario_id=session.scenario.id, snapshot=session.snapshot())
+
+    def _scenario_path(self, scenario_id: str) -> Path:
+        safe_id = self._normalize_identifier(scenario_id)
+        path = SCENARIOS_DIR / f"{safe_id}.json"
+        if not path.is_file():
+            raise FileNotFoundError(f"Scenario not found: {safe_id}")
+        return path
+
+    def _normalize_identifier(self, value: str) -> str:
+        normalized = "".join(char if char.isalnum() or char in {"-", "_"} else "-" for char in value).strip("-")
+        if not normalized:
+            raise ValueError("Identifier must contain at least one alphanumeric character")
+        return normalized
 
 
 SESSION_STORE = SessionStore()

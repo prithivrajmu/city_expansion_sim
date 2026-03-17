@@ -12,6 +12,8 @@ Workflow Stack Integration
 
 - Review report refreshed at `/home/prithiv/Prithiv_Projects/city_expansion_sim/ops/prstack/state/reports/review.md`
 - QA report refreshed at `/home/prithiv/Prithiv_Projects/city_expansion_sim/ops/prstack/state/reports/qa.md`
+- CEO review refreshed at `/home/prithiv/Prithiv_Projects/city_expansion_sim/ops/prstack/state/reports/ceo-review.md`
+- Security review refreshed at `/home/prithiv/Prithiv_Projects/city_expansion_sim/ops/prstack/state/reports/security-review.md`
 - Current slice tracked at `/home/prithiv/Prithiv_Projects/city_expansion_sim/ops/prstack/state/current-slice.md`
 
 ## Next
@@ -19,6 +21,7 @@ Workflow Stack Integration
 - Continue the active slice or open a new one with `prstack slice "Title"`
 - Use `prstack review` before structural merges
 - Use `prstack qa` after simulation or API changes
+- Use `prstack ceo-review` and `prstack security-review` to keep product and risk guidance current
 
 ## Risks
 
