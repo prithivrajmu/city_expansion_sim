@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+output/*.png
+output/*.npy
+.env
+.DS_Store
+.vscode
+node_modules/
+build/
+dist/

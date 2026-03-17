@@ -1,0 +1,11 @@
+# Docker Setup Notes
+
+The previous Docker notes were tied to the old Flask prototype.
+
+This file is now a placeholder until the rebuild stack is chosen.
+
+Expected future split:
+
+- backend container for session orchestration and simulation APIs
+- frontend container for the interactive client
+- optional worker container if long-running simulation steps need separation

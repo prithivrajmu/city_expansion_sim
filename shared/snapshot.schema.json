@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Simulation Snapshot",
+  "type": "object",
+  "required": ["tick", "year", "title", "summary", "metrics", "grid", "events", "interventions", "districts"],
+  "properties": {
+    "tick": { "type": "integer" },
+    "year": { "type": "integer" },
+    "title": { "type": "string" },
+    "summary": { "type": "string" },
+    "metrics": { "type": "object" },
+    "grid": { "type": "array" },
+    "events": { "type": "array", "items": { "type": "string" } },
+    "interventions": { "type": "array", "items": { "type": "object" } },
+    "districts": { "type": "array", "items": { "type": "string" } }
+  }
+}

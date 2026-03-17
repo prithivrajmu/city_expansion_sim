@@ -1,0 +1,76 @@
+{
+  "id": "chennai_coastal_corridor",
+  "name": "Chennai Coastal Corridor",
+  "description": "A compact city-growth scenario focused on transit-led expansion, coastal flood risk, and rising land values across the corridor.",
+  "focus": "Transit access, resident demand, developer pressure, and flood-risk tradeoffs.",
+  "baseYear": 2025,
+  "ticksPerYear": 4,
+  "gridWidth": 6,
+  "gridHeight": 6,
+  "policyBoost": 0.18,
+  "residentDemand": 0.72,
+  "developerPressure": 0.68,
+  "infrastructureMomentum": 0.76,
+  "agentProfiles": {
+    "residents": { "mobility": 1.08, "housingUrgency": 1.04 },
+    "developers": { "capitalAggression": 1.02, "speculation": 1.06 },
+    "government": { "deliveryBias": 1.05, "coordination": 1.03 }
+  },
+  "events": [
+    {
+      "tick": 2,
+      "title": "Blue Line extension contract award",
+      "district": "Outer Growth",
+      "impact": { "access": 0.08, "landValue": 12, "population": 8 }
+    },
+    {
+      "tick": 4,
+      "title": "Monsoon warning and drainage stress",
+      "district": "Floodplain",
+      "impact": { "risk": 0.09, "landValue": -6, "population": -3 }
+    }
+  ],
+  "cells": [
+    { "district": "North Harbor", "kind": "urban", "urbanized": true, "population": 410, "landValue": 240, "risk": 0.22, "access": 0.91 },
+    { "district": "North Harbor", "kind": "urban", "urbanized": true, "population": 390, "landValue": 228, "risk": 0.25, "access": 0.88 },
+    { "district": "Periphery", "kind": "green", "urbanized": false, "population": 95, "landValue": 132, "risk": 0.20, "access": 0.75 },
+    { "district": "Periphery", "kind": "green", "urbanized": false, "population": 72, "landValue": 120, "risk": 0.21, "access": 0.69 },
+    { "district": "Wetlands", "kind": "water", "urbanized": false, "population": 0, "landValue": 80, "risk": 0.90, "access": 0.18 },
+    { "district": "Wetlands", "kind": "water", "urbanized": false, "population": 0, "landValue": 78, "risk": 0.93, "access": 0.12 },
+
+    { "district": "North Harbor", "kind": "urban", "urbanized": true, "population": 405, "landValue": 236, "risk": 0.20, "access": 0.94 },
+    { "district": "Connector", "kind": "suburban", "urbanized": true, "population": 270, "landValue": 195, "risk": 0.16, "access": 0.84 },
+    { "district": "Connector", "kind": "green", "urbanized": false, "population": 84, "landValue": 126, "risk": 0.14, "access": 0.80 },
+    { "district": "Connector", "kind": "green", "urbanized": false, "population": 78, "landValue": 122, "risk": 0.12, "access": 0.77 },
+    { "district": "Canal Edge", "kind": "green", "urbanized": false, "population": 64, "landValue": 116, "risk": 0.48, "access": 0.60 },
+    { "district": "Canal Edge", "kind": "green", "urbanized": false, "population": 58, "landValue": 110, "risk": 0.53, "access": 0.56 },
+
+    { "district": "Tech Spine", "kind": "suburban", "urbanized": true, "population": 255, "landValue": 190, "risk": 0.10, "access": 0.86 },
+    { "district": "Tech Spine", "kind": "suburban", "urbanized": true, "population": 248, "landValue": 188, "risk": 0.08, "access": 0.89 },
+    { "district": "Tech Spine", "kind": "green", "urbanized": false, "population": 92, "landValue": 134, "risk": 0.09, "access": 0.85 },
+    { "district": "Tech Spine", "kind": "green", "urbanized": false, "population": 89, "landValue": 132, "risk": 0.11, "access": 0.82 },
+    { "district": "Canal Edge", "kind": "green", "urbanized": false, "population": 73, "landValue": 118, "risk": 0.45, "access": 0.63 },
+    { "district": "Canal Edge", "kind": "green", "urbanized": false, "population": 70, "landValue": 115, "risk": 0.47, "access": 0.61 },
+
+    { "district": "Southern Ring", "kind": "suburban", "urbanized": true, "population": 240, "landValue": 184, "risk": 0.13, "access": 0.82 },
+    { "district": "Southern Ring", "kind": "suburban", "urbanized": true, "population": 236, "landValue": 180, "risk": 0.15, "access": 0.78 },
+    { "district": "Southern Ring", "kind": "green", "urbanized": false, "population": 88, "landValue": 130, "risk": 0.18, "access": 0.76 },
+    { "district": "Southern Ring", "kind": "green", "urbanized": false, "population": 82, "landValue": 124, "risk": 0.19, "access": 0.73 },
+    { "district": "Floodplain", "kind": "green", "urbanized": false, "population": 48, "landValue": 102, "risk": 0.62, "access": 0.48 },
+    { "district": "Floodplain", "kind": "green", "urbanized": false, "population": 44, "landValue": 96, "risk": 0.66, "access": 0.44 },
+
+    { "district": "Airport Arc", "kind": "green", "urbanized": false, "population": 94, "landValue": 138, "risk": 0.16, "access": 0.79 },
+    { "district": "Airport Arc", "kind": "green", "urbanized": false, "population": 89, "landValue": 134, "risk": 0.18, "access": 0.77 },
+    { "district": "Airport Arc", "kind": "green", "urbanized": false, "population": 86, "landValue": 128, "risk": 0.14, "access": 0.81 },
+    { "district": "Airport Arc", "kind": "green", "urbanized": false, "population": 81, "landValue": 124, "risk": 0.15, "access": 0.74 },
+    { "district": "Floodplain", "kind": "green", "urbanized": false, "population": 41, "landValue": 92, "risk": 0.70, "access": 0.42 },
+    { "district": "Floodplain", "kind": "green", "urbanized": false, "population": 37, "landValue": 88, "risk": 0.74, "access": 0.38 },
+
+    { "district": "Outer Growth", "kind": "green", "urbanized": false, "population": 97, "landValue": 136, "risk": 0.17, "access": 0.72 },
+    { "district": "Outer Growth", "kind": "green", "urbanized": false, "population": 93, "landValue": 130, "risk": 0.20, "access": 0.70 },
+    { "district": "Outer Growth", "kind": "green", "urbanized": false, "population": 91, "landValue": 126, "risk": 0.18, "access": 0.68 },
+    { "district": "Outer Growth", "kind": "green", "urbanized": false, "population": 84, "landValue": 120, "risk": 0.21, "access": 0.66 },
+    { "district": "Reserve Belt", "kind": "green", "urbanized": false, "population": 50, "landValue": 98, "risk": 0.28, "access": 0.52 },
+    { "district": "Reserve Belt", "kind": "green", "urbanized": false, "population": 46, "landValue": 94, "risk": 0.30, "access": 0.50 }
+  ]
+}

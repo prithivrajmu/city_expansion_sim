@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "City Expansion Scenario",
+  "type": "object",
+  "required": [
+    "id",
+    "name",
+    "description",
+    "focus",
+    "baseYear",
+    "ticksPerYear",
+    "gridWidth",
+    "gridHeight",
+    "policyBoost",
+    "residentDemand",
+    "developerPressure",
+    "infrastructureMomentum",
+    "agentProfiles",
+    "events",
+    "cells"
+  ],
+  "properties": {
+    "id": { "type": "string" },
+    "name": { "type": "string" },
+    "description": { "type": "string" },
+    "focus": { "type": "string" },
+    "baseYear": { "type": "integer" },
+    "ticksPerYear": { "type": "integer", "minimum": 1 },
+    "gridWidth": { "type": "integer", "minimum": 1 },
+    "gridHeight": { "type": "integer", "minimum": 1 },
+    "policyBoost": { "type": "number" },
+    "residentDemand": { "type": "number" },
+    "developerPressure": { "type": "number" },
+    "infrastructureMomentum": { "type": "number" },
+    "agentProfiles": {
+      "type": "object",
+      "properties": {
+        "residents": { "type": "object" },
+        "developers": { "type": "object" },
+        "government": { "type": "object" }
+      }
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["tick", "title", "impact"],
+        "properties": {
+          "tick": { "type": "integer", "minimum": 1 },
+          "title": { "type": "string" },
+          "district": { "type": "string" },
+          "impact": { "type": "object" }
+        }
+      }
+    },
+    "cells": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["district", "kind", "urbanized", "population", "landValue", "risk", "access"],
+        "properties": {
+          "district": { "type": "string" },
+          "kind": { "type": "string" },
+          "urbanized": { "type": "boolean" },
+          "population": { "type": "integer" },
+          "landValue": { "type": "integer" },
+          "risk": { "type": "number" },
+          "access": { "type": "number" }
+        }
+      }
+    }
+  }
+}

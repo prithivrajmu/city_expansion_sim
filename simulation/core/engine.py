@@ -1,0 +1,416 @@
+from __future__ import annotations
+
+import json
+from dataclasses import asdict, dataclass
+from pathlib import Path
+
+
+@dataclass
+class CellSnapshot:
+    index: int
+    district: str
+    kind: str
+    urbanized: bool
+    population: int
+    land_value: int
+    risk: float
+    access: float
+
+
+@dataclass
+class SimulationSnapshot:
+    tick: int
+    year: int
+    title: str
+    summary: str
+    metrics: dict
+    grid: list[CellSnapshot]
+    events: list[str]
+    interventions: list[dict]
+    districts: list[str]
+
+
+@dataclass
+class Scenario:
+    id: str
+    name: str
+    description: str
+    focus: str
+    baseYear: int
+    ticksPerYear: int
+    gridWidth: int
+    gridHeight: int
+    policyBoost: float
+    residentDemand: float
+    developerPressure: float
+    infrastructureMomentum: float
+    agentProfiles: dict
+    events: list[dict]
+    cells: list[dict]
+
+
+@dataclass
+class TimelineEntry:
+    tick: int
+    year: int
+    urbanCells: int
+    population: int
+    averageLandValue: int
+    interventionCount: int
+
+
+class SimulationSession:
+    def __init__(self, scenario: Scenario) -> None:
+        self.scenario = scenario
+        self.tick_count = 0
+        self.cells = [cell.copy() for cell in scenario.cells]
+        self.interventions: list[dict] = []
+        self.events: list[str] = [
+            f"Scenario '{scenario.name}' initialized with {len(self.cells)} cells."
+        ]
+        self.applied_events: list[dict] = []
+        self.history: list[dict] = []
+        self._record_history()
+
+    def tick(self) -> None:
+        width = self.scenario.gridWidth
+        threshold = 1.2 - self.scenario.policyBoost
+        resident_pressure = self._resident_pressure()
+        developer_pressure = self._developer_pressure()
+        government_pressure = self._government_pressure()
+        self._apply_scheduled_events()
+        next_cells: list[dict] = []
+        conversions = 0
+
+        for index, cell in enumerate(self.cells):
+            urban_neighbors = self._urban_neighbor_ratio(index, width)
+            growth_signal = (
+                urban_neighbors * 0.8
+                + cell["access"] * self.scenario.infrastructureMomentum
+                + resident_pressure * 0.4
+                + developer_pressure * 0.35
+                + government_pressure * 0.2
+                - cell["risk"] * 0.55
+            )
+
+            next_cell = cell.copy()
+            if not cell["urbanized"] and cell["kind"] != "water" and growth_signal >= threshold:
+                next_cell["urbanized"] = True
+                next_cell["kind"] = "urban"
+                next_cell["population"] += 120
+                next_cell["landValue"] += 80
+                conversions += 1
+            elif cell["urbanized"]:
+                next_cell["population"] += int(18 + (cell["access"] * 12) - (cell["risk"] * 6))
+                next_cell["landValue"] += int(12 + (urban_neighbors * 10))
+            else:
+                next_cell["landValue"] += int(2 + (cell["access"] * 4) - (cell["risk"] * 2))
+
+            next_cells.append(next_cell)
+
+        self.cells = next_cells
+        self.tick_count += 1
+        year = self._current_year()
+        self.events.append(
+            f"Tick {self.tick_count}: {conversions} cells urbanized, corridor pressure at year {year}."
+        )
+        self.events = self.events[-10:]
+        self._record_history()
+
+    def apply_command(self, command: dict) -> None:
+        command_type = command.get("type")
+        district = command.get("district")
+        strength = float(command.get("strength", 0.08))
+
+        if command_type not in {"upzone_district", "build_transit", "flood_barrier"}:
+            raise ValueError(f"Unsupported command type: {command_type}")
+
+        touched = 0
+        for cell in self.cells:
+            if district and cell["district"] != district:
+                continue
+            if cell["kind"] == "water":
+                continue
+
+            if command_type == "upzone_district":
+                cell["landValue"] += int(16 + (strength * 40))
+                cell["population"] += int(10 + (strength * 28))
+                cell["access"] = min(1.0, cell["access"] + strength * 0.2)
+            elif command_type == "build_transit":
+                cell["access"] = min(1.0, cell["access"] + strength)
+                cell["landValue"] += int(14 + (strength * 30))
+            elif command_type == "flood_barrier":
+                cell["risk"] = max(0.0, cell["risk"] - strength)
+                cell["landValue"] += int(8 + (strength * 20))
+            touched += 1
+
+        applied = {
+            "type": command_type,
+            "district": district or "all",
+            "strength": round(strength, 2),
+            "tick": self.tick_count,
+            "touched": touched,
+        }
+        self.interventions.append(applied)
+        self.interventions = self.interventions[-12:]
+        self.events.append(
+            f"Command applied: {command_type} in {applied['district']} touching {touched} cells."
+        )
+        self.events = self.events[-10:]
+        self._record_history()
+
+    def snapshot(self) -> SimulationSnapshot:
+        metrics = self._metrics()
+        return SimulationSnapshot(
+            tick=self.tick_count,
+            year=self._current_year(),
+            title=self.scenario.name,
+            summary=(
+                "A deterministic city-growth slice with residents, developers, policy boost, "
+                "infrastructure access, and flood-risk pressure."
+            ),
+            metrics=metrics,
+            grid=[
+                CellSnapshot(
+                    index=index,
+                    district=cell["district"],
+                    kind=cell["kind"],
+                    urbanized=cell["urbanized"],
+                    population=cell["population"],
+                    land_value=cell["landValue"],
+                    risk=cell["risk"],
+                    access=cell["access"],
+                )
+                for index, cell in enumerate(self.cells)
+            ],
+            events=list(self.events),
+            interventions=list(self.interventions),
+            districts=self.districts(),
+        )
+
+    def _metrics(self) -> dict:
+        urban_cells = sum(1 for cell in self.cells if cell["urbanized"])
+        population = sum(cell["population"] for cell in self.cells)
+        average_land_value = sum(cell["landValue"] for cell in self.cells) // len(self.cells)
+        average_risk = round(sum(cell["risk"] for cell in self.cells) / len(self.cells), 3)
+        average_access = round(sum(cell["access"] for cell in self.cells) / len(self.cells), 3)
+        return {
+            "urbanCells": urban_cells,
+            "population": population,
+            "averageLandValue": average_land_value,
+            "urbanizationRate": round(urban_cells / len(self.cells), 3),
+            "averageRisk": average_risk,
+            "averageAccess": average_access,
+            "interventionCount": len(self.interventions),
+            "residentPressure": self._resident_pressure(),
+            "developerPressure": self._developer_pressure(),
+            "governmentPressure": self._government_pressure(),
+            "eventCount": len(self.applied_events),
+        }
+
+    def districts(self) -> list[str]:
+        return sorted({cell["district"] for cell in self.cells if cell["kind"] != "water"})
+
+    def _urban_neighbor_ratio(self, index: int, width: int) -> float:
+        neighbors = self._neighbor_indices(index, width, len(self.cells))
+        if not neighbors:
+            return 0.0
+        urban_neighbors = sum(1 for neighbor in neighbors if self.cells[neighbor]["urbanized"])
+        return urban_neighbors / len(neighbors)
+
+    def _neighbor_indices(self, index: int, width: int, total: int) -> list[int]:
+        row = index // width
+        col = index % width
+        neighbors: list[int] = []
+        for d_row in (-1, 0, 1):
+            for d_col in (-1, 0, 1):
+                if d_row == 0 and d_col == 0:
+                    continue
+                next_row = row + d_row
+                next_col = col + d_col
+                if next_row < 0 or next_col < 0:
+                    continue
+                next_index = next_row * width + next_col
+                if next_col >= width or next_index >= total:
+                    continue
+                neighbors.append(next_index)
+        return neighbors
+
+    def _current_year(self) -> int:
+        return self.scenario.baseYear + (self.tick_count // self.scenario.ticksPerYear)
+
+    def _resident_pressure(self) -> float:
+        profile = self.scenario.agentProfiles.get("residents", {})
+        return round(self.scenario.residentDemand * profile.get("mobility", 1.0) * profile.get("housingUrgency", 1.0), 3)
+
+    def _developer_pressure(self) -> float:
+        profile = self.scenario.agentProfiles.get("developers", {})
+        return round(self.scenario.developerPressure * profile.get("capitalAggression", 1.0) * profile.get("speculation", 1.0), 3)
+
+    def _government_pressure(self) -> float:
+        profile = self.scenario.agentProfiles.get("government", {})
+        return round(self.scenario.policyBoost * profile.get("deliveryBias", 1.0) * profile.get("coordination", 1.0), 3)
+
+    def _apply_scheduled_events(self) -> None:
+        next_tick = self.tick_count + 1
+        due_events = [event for event in self.scenario.events if event["tick"] == next_tick]
+        for event in due_events:
+            self._apply_event(event)
+
+    def _apply_event(self, event: dict) -> None:
+        district = event.get("district")
+        impact = event.get("impact", {})
+        touched = 0
+        for cell in self.cells:
+            if district and cell["district"] != district:
+                continue
+            if cell["kind"] == "water":
+                continue
+            cell["access"] = min(1.0, max(0.0, cell["access"] + impact.get("access", 0.0)))
+            cell["risk"] = min(1.0, max(0.0, cell["risk"] + impact.get("risk", 0.0)))
+            cell["landValue"] += int(impact.get("landValue", 0))
+            cell["population"] += int(impact.get("population", 0))
+            touched += 1
+        record = {
+            "tick": event["tick"],
+            "title": event["title"],
+            "district": district or "all",
+            "touched": touched,
+        }
+        self.applied_events.append(record)
+        self.applied_events = self.applied_events[-12:]
+        self.events.append(f"Scenario event: {event['title']} affected {record['district']} ({touched} cells).")
+        self.events = self.events[-10:]
+
+    def _record_history(self) -> None:
+        metrics = self._metrics()
+        entry = {
+            "tick": self.tick_count,
+            "year": self._current_year(),
+            "metrics": metrics,
+            "cells": [cell.copy() for cell in self.cells],
+            "events": list(self.events),
+            "interventions": list(self.interventions),
+            "scenarioEvents": list(self.applied_events),
+        }
+        if self.history and self.history[-1]["tick"] == self.tick_count:
+            self.history[-1] = entry
+        else:
+            self.history.append(entry)
+        self.history = self.history[-64:]
+
+    def timeline(self) -> list[TimelineEntry]:
+        return [
+            TimelineEntry(
+                tick=entry["tick"],
+                year=entry["year"],
+                urbanCells=entry["metrics"]["urbanCells"],
+                population=entry["metrics"]["population"],
+                averageLandValue=entry["metrics"]["averageLandValue"],
+                interventionCount=entry["metrics"]["interventionCount"],
+            )
+            for entry in self.history
+        ]
+
+    def replay(self, tick: int) -> dict:
+        if tick < 0:
+            raise ValueError("Tick must be non-negative")
+        for entry in self.history:
+            if entry["tick"] == tick:
+                return {
+                    "tick": entry["tick"],
+                    "year": entry["year"],
+                    "metrics": entry["metrics"],
+                    "grid": [
+                        CellSnapshot(
+                            index=index,
+                            district=cell["district"],
+                            kind=cell["kind"],
+                            urbanized=cell["urbanized"],
+                            population=cell["population"],
+                            land_value=cell["landValue"],
+                            risk=cell["risk"],
+                            access=cell["access"],
+                        )
+                        for index, cell in enumerate(entry["cells"])
+                    ],
+                    "events": entry["events"],
+                    "interventions": entry["interventions"],
+                    "scenarioEvents": entry.get("scenarioEvents", []),
+                }
+        raise ValueError(f"Replay tick not found: {tick}")
+
+    def export_state(self) -> dict:
+        return {
+            "scenario": asdict(self.scenario),
+            "tickCount": self.tick_count,
+            "cells": [cell.copy() for cell in self.cells],
+            "interventions": list(self.interventions),
+            "appliedEvents": list(self.applied_events),
+            "events": list(self.events),
+            "history": self.history,
+        }
+
+    @classmethod
+    def from_state(cls, state: dict) -> "SimulationSession":
+        scenario = Scenario(**state["scenario"])
+        session = cls(scenario=scenario)
+        session.tick_count = state["tickCount"]
+        session.cells = [cell.copy() for cell in state["cells"]]
+        session.interventions = list(state["interventions"])
+        session.applied_events = list(state.get("appliedEvents", []))
+        session.events = list(state["events"])
+        session.history = list(state.get("history", [])) or []
+        if not session.history:
+            session._record_history()
+        return session
+
+    def report(self) -> dict:
+        metrics = self._metrics()
+        fastest_growth = sorted(
+            self.cells,
+            key=lambda cell: (cell["urbanized"], cell["access"], cell["landValue"]),
+            reverse=True,
+        )[:3]
+        risk_zones = sorted(self.cells, key=lambda cell: cell["risk"], reverse=True)[:3]
+        return {
+            "headline": (
+                f"{self.scenario.name} at year {self._current_year()} has "
+                f"{metrics['urbanCells']} urban cells and population {metrics['population']}."
+            ),
+            "summary": [
+                f"Urbanization rate is {metrics['urbanizationRate']} with average land value {metrics['averageLandValue']}.",
+                f"Average infrastructure access is {metrics['averageAccess']} and average risk is {metrics['averageRisk']}.",
+                f"{metrics['interventionCount']} interventions have been applied in this session.",
+                f"Resident pressure is {metrics['residentPressure']}, developer pressure is {metrics['developerPressure']}, and government pressure is {metrics['governmentPressure']}.",
+            ],
+            "growthFrontier": [
+                {
+                    "district": cell["district"],
+                    "population": cell["population"],
+                    "landValue": cell["landValue"],
+                    "access": cell["access"],
+                }
+                for cell in fastest_growth
+            ],
+            "riskWatch": [
+                {
+                    "district": cell["district"],
+                    "risk": cell["risk"],
+                    "landValue": cell["landValue"],
+                }
+                for cell in risk_zones
+            ],
+            "interventions": list(self.interventions),
+            "scenarioEvents": list(self.applied_events),
+            "recentEvents": list(self.events[-5:]),
+            "timeline": [asdict(entry) for entry in self.timeline()],
+            "agentSummary": self.scenario.agentProfiles,
+        }
+
+
+def create_session_from_scenario(path: Path) -> SimulationSession:
+    with path.open("r", encoding="utf-8") as handle:
+        data = json.load(handle)
+    scenario = Scenario(**data)
+    return SimulationSession(scenario=scenario)

@@ -1,0 +1,343 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+STATE_DIR="${ROOT_DIR}/ops/prstack/state"
+TEMPLATE_DIR="${ROOT_DIR}/ops/prstack/templates"
+REPORT_DIR="${STATE_DIR}/reports"
+SLICE_DIR="${STATE_DIR}/slices"
+NOW="$(date +%F)"
+
+render_template() {
+  local template_path="$1"
+  local output_path="$2"
+  local title="${3:-Current Implementation Slice}"
+
+  sed \
+    -e "s/{{DATE}}/${NOW}/g" \
+    -e "s/{{TITLE}}/${title}/g" \
+    "${template_path}" > "${output_path}"
+}
+
+usage() {
+  cat <<'EOF'
+Usage:
+  prstack bootstrap
+  prstack install
+  prstack dev
+  prstack plan "Title"
+  prstack slice "Title"
+  prstack review
+  prstack qa
+  prstack ship
+  prstack handoff
+  prstack status
+EOF
+}
+
+bootstrap() {
+  mkdir -p "${STATE_DIR}" "${REPORT_DIR}" "${SLICE_DIR}"
+
+  if [[ ! -f "${STATE_DIR}/mission.md" ]]; then
+    cp "${TEMPLATE_DIR}/mission.md" "${STATE_DIR}/mission.md"
+  fi
+
+  if [[ ! -f "${STATE_DIR}/tasks.md" ]]; then
+    cp "${TEMPLATE_DIR}/tasks.md" "${STATE_DIR}/tasks.md"
+  fi
+
+  if [[ ! -f "${STATE_DIR}/current-slice.md" ]]; then
+    render_template "${TEMPLATE_DIR}/current-slice.md" "${STATE_DIR}/current-slice.md"
+  fi
+
+  if [[ ! -f "${REPORT_DIR}/review.md" ]]; then
+    render_template "${TEMPLATE_DIR}/review.md" "${REPORT_DIR}/review.md"
+  fi
+
+  if [[ ! -f "${REPORT_DIR}/qa.md" ]]; then
+    render_template "${TEMPLATE_DIR}/qa.md" "${REPORT_DIR}/qa.md"
+  fi
+
+  if [[ ! -f "${REPORT_DIR}/handoff.md" ]]; then
+    render_template "${TEMPLATE_DIR}/handoff.md" "${REPORT_DIR}/handoff.md"
+  fi
+
+  printf 'Initialized prstack state in %s\n' "${STATE_DIR}"
+}
+
+status() {
+  bootstrap >/dev/null
+
+  printf 'Repo: %s\n' "${ROOT_DIR}"
+  printf 'Mission: %s\n' "${STATE_DIR}/mission.md"
+  printf 'Tasks: %s\n' "${STATE_DIR}/tasks.md"
+  printf 'Current Slice: %s\n' "${STATE_DIR}/current-slice.md"
+  printf 'Review Report: %s\n' "${REPORT_DIR}/review.md"
+  printf 'QA Report: %s\n' "${REPORT_DIR}/qa.md"
+  printf 'Handoff: %s\n' "${REPORT_DIR}/handoff.md"
+
+  if [[ -f "${STATE_DIR}/tasks.md" ]]; then
+    printf '\nOpen tasks:\n'
+    grep '^\- \[ \]' "${STATE_DIR}/tasks.md" || true
+  fi
+}
+
+install() {
+  (cd "${ROOT_DIR}" && npm run setup:all)
+}
+
+dev() {
+  bootstrap
+
+  if [[ ! -d "${ROOT_DIR}/node_modules" || ! -d "${ROOT_DIR}/frontend/node_modules" || ! -d "${ROOT_DIR}/backend/.venv" ]]; then
+    printf 'Dependencies missing. Running prstack install first.\n'
+    install
+  fi
+
+  (cd "${ROOT_DIR}" && npm run dev)
+}
+
+plan() {
+  bootstrap >/dev/null
+  local title="${1:-Current Implementation Slice}"
+  render_template "${TEMPLATE_DIR}/current-slice.md" "${STATE_DIR}/current-slice.md" "${title}"
+  printf 'Updated current slice: %s\n' "${STATE_DIR}/current-slice.md"
+}
+
+slugify() {
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//'
+}
+
+slice() {
+  bootstrap >/dev/null
+  local title="${1:-Implementation Slice}"
+  local slug
+  slug="$(slugify "${title}")"
+  local output="${SLICE_DIR}/${NOW}-${slug}.md"
+  render_template "${TEMPLATE_DIR}/current-slice.md" "${output}" "${title}"
+  cp "${output}" "${STATE_DIR}/current-slice.md"
+  printf 'Created slice: %s\n' "${output}"
+}
+
+review() {
+  bootstrap >/dev/null
+  local frontend_status="pass"
+  local backend_status="pass"
+  local frontend_output
+  local backend_output
+
+  if ! frontend_output="$(cd "${ROOT_DIR}/frontend" && npm run build 2>&1)"; then
+    frontend_status="fail"
+  fi
+
+  if ! backend_output="$(cd "${ROOT_DIR}/backend" && uv run --with pytest pytest -q 2>&1)"; then
+    backend_status="fail"
+  fi
+
+  cat > "${REPORT_DIR}/review.md" <<EOF
+# Review Report
+
+## Date
+
+${NOW}
+
+## Summary
+
+- frontend build: ${frontend_status}
+- backend tests: ${backend_status}
+
+## Checks
+
+- frontend build: ${frontend_status}
+- backend tests: ${backend_status}
+
+## Findings
+
+$(if [[ "${frontend_status}" == "pass" && "${backend_status}" == "pass" ]]; then
+    printf '%s\n' '- No automated review findings from the current build-and-test pass.'
+  else
+    printf '%s\n' '- Automated review detected at least one failing verification step.'
+  fi)
+
+## Raw Output
+
+\`\`\`
+${frontend_output}
+
+${backend_output}
+\`\`\`
+EOF
+
+  printf 'Wrote review report: %s\n' "${REPORT_DIR}/review.md"
+  [[ "${frontend_status}" == "pass" && "${backend_status}" == "pass" ]]
+}
+
+qa() {
+  bootstrap >/dev/null
+  local api_status="pass"
+  local qa_output
+
+  if ! qa_output="$(cd "${ROOT_DIR}/backend" && uv run python - <<'PY'
+from app.server import app
+
+client = app.test_client()
+health = client.get("/health")
+assert health.status_code == 200
+scenarios = client.get("/scenarios")
+assert scenarios.status_code == 200
+payload = client.post("/sessions", json={"scenarioId": "metro_delta_arc"}).get_json()
+sid = payload["sessionId"]
+client.post(f"/sessions/{sid}/commands", json={"type": "flood_barrier", "district": "Low Basin", "strength": 0.14})
+tick = client.post(f"/sessions/{sid}/tick", json={"steps": 3})
+assert tick.status_code == 200
+report = client.get(f"/sessions/{sid}/report")
+assert report.status_code == 200
+print("health ok")
+print("scenario count", len(scenarios.get_json()["items"]))
+print("tick", tick.get_json()["snapshot"]["tick"])
+print("headline", report.get_json()["headline"])
+PY
+ 2>&1)"; then
+    api_status="fail"
+  fi
+
+  cat > "${REPORT_DIR}/qa.md" <<EOF
+# QA Report
+
+## Date
+
+${NOW}
+
+## Summary
+
+- api smoke: ${api_status}
+
+## Coverage
+
+- health endpoint
+- scenario catalog
+- session creation
+- command application
+- report generation
+
+## Notes
+
+\`\`\`
+${qa_output}
+\`\`\`
+EOF
+
+  printf 'Wrote QA report: %s\n' "${REPORT_DIR}/qa.md"
+  [[ "${api_status}" == "pass" ]]
+}
+
+handoff() {
+  bootstrap >/dev/null
+  local title
+  title="$(sed -n '5p' "${STATE_DIR}/current-slice.md" | tr -d '\r')"
+  cat > "${REPORT_DIR}/handoff.md" <<EOF
+# Handoff
+
+## Date
+
+${NOW}
+
+## Current Slice
+
+${title}
+
+## Completed
+
+- Review report refreshed at \`${REPORT_DIR}/review.md\`
+- QA report refreshed at \`${REPORT_DIR}/qa.md\`
+- Current slice tracked at \`${STATE_DIR}/current-slice.md\`
+
+## Next
+
+- Continue the active slice or open a new one with \`prstack slice "Title"\`
+- Use \`prstack review\` before structural merges
+- Use \`prstack qa\` after simulation or API changes
+
+## Risks
+
+- Ship flow is still local-report based because this project is not yet a git repo with PR automation
+EOF
+
+  printf 'Wrote handoff report: %s\n' "${REPORT_DIR}/handoff.md"
+}
+
+ship() {
+  bootstrap >/dev/null
+  review
+  qa
+  handoff
+  cat > "${REPORT_DIR}/ship.md" <<EOF
+# Ship Report
+
+## Date
+
+${NOW}
+
+## Status
+
+- review completed
+- qa completed
+- handoff prepared
+
+## Notes
+
+- This is a local ship gate, not a PR automation workflow yet.
+- Use the generated reports under \`${REPORT_DIR}\` as the release packet.
+EOF
+  printf 'Wrote ship report: %s\n' "${REPORT_DIR}/ship.md"
+}
+
+main() {
+  if [[ $# -lt 1 ]]; then
+    usage
+    exit 1
+  fi
+
+  case "$1" in
+    bootstrap)
+      bootstrap
+      ;;
+    install)
+      install
+      ;;
+    dev)
+      dev
+      ;;
+    plan)
+      shift
+      plan "${*:-Current Implementation Slice}"
+      ;;
+    slice)
+      shift
+      slice "${*:-Implementation Slice}"
+      ;;
+    review)
+      review
+      ;;
+    qa)
+      qa
+      ;;
+    ship)
+      ship
+      ;;
+    handoff)
+      handoff
+      ;;
+    status)
+      status
+      ;;
+    *)
+      usage
+      exit 1
+      ;;
+  esac
+}
+
+main "$@"

@@ -1,0 +1,76 @@
+{
+  "id": "metro_delta_arc",
+  "name": "Metro Delta Arc",
+  "description": "An inland expansion scenario centered on ring-road growth, logistics pressure, and selective resilience investments.",
+  "focus": "Ring-road access, logistics clustering, inland growth pressure, and flood-mitigation tradeoffs.",
+  "baseYear": 2026,
+  "ticksPerYear": 4,
+  "gridWidth": 6,
+  "gridHeight": 6,
+  "policyBoost": 0.12,
+  "residentDemand": 0.66,
+  "developerPressure": 0.74,
+  "infrastructureMomentum": 0.71,
+  "agentProfiles": {
+    "residents": { "mobility": 1.04, "housingUrgency": 1.01 },
+    "developers": { "capitalAggression": 1.12, "speculation": 1.08 },
+    "government": { "deliveryBias": 0.98, "coordination": 1.06 }
+  },
+  "events": [
+    {
+      "tick": 1,
+      "title": "Ring road freight interchange opens",
+      "district": "Freight Edge",
+      "impact": { "access": 0.12, "landValue": 14, "population": 6 }
+    },
+    {
+      "tick": 3,
+      "title": "Low Basin flood-control budget delay",
+      "district": "Low Basin",
+      "impact": { "risk": 0.08, "landValue": -8, "population": -2 }
+    }
+  ],
+  "cells": [
+    { "district": "North Gate", "kind": "urban", "urbanized": true, "population": 360, "landValue": 226, "risk": 0.16, "access": 0.87 },
+    { "district": "North Gate", "kind": "urban", "urbanized": true, "population": 348, "landValue": 220, "risk": 0.18, "access": 0.84 },
+    { "district": "Freight Edge", "kind": "suburban", "urbanized": true, "population": 244, "landValue": 188, "risk": 0.14, "access": 0.82 },
+    { "district": "Freight Edge", "kind": "green", "urbanized": false, "population": 96, "landValue": 136, "risk": 0.13, "access": 0.77 },
+    { "district": "Reservoir", "kind": "water", "urbanized": false, "population": 0, "landValue": 82, "risk": 0.92, "access": 0.18 },
+    { "district": "Reservoir", "kind": "water", "urbanized": false, "population": 0, "landValue": 80, "risk": 0.94, "access": 0.14 },
+
+    { "district": "North Gate", "kind": "urban", "urbanized": true, "population": 352, "landValue": 224, "risk": 0.17, "access": 0.85 },
+    { "district": "Ring One", "kind": "suburban", "urbanized": true, "population": 232, "landValue": 180, "risk": 0.12, "access": 0.80 },
+    { "district": "Ring One", "kind": "green", "urbanized": false, "population": 92, "landValue": 132, "risk": 0.11, "access": 0.78 },
+    { "district": "Ring One", "kind": "green", "urbanized": false, "population": 89, "landValue": 128, "risk": 0.12, "access": 0.75 },
+    { "district": "Canal South", "kind": "green", "urbanized": false, "population": 61, "landValue": 110, "risk": 0.49, "access": 0.58 },
+    { "district": "Canal South", "kind": "green", "urbanized": false, "population": 56, "landValue": 106, "risk": 0.55, "access": 0.53 },
+
+    { "district": "Innovation Mile", "kind": "suburban", "urbanized": true, "population": 248, "landValue": 192, "risk": 0.09, "access": 0.86 },
+    { "district": "Innovation Mile", "kind": "suburban", "urbanized": true, "population": 240, "landValue": 188, "risk": 0.08, "access": 0.88 },
+    { "district": "Innovation Mile", "kind": "green", "urbanized": false, "population": 98, "landValue": 138, "risk": 0.10, "access": 0.83 },
+    { "district": "Innovation Mile", "kind": "green", "urbanized": false, "population": 94, "landValue": 134, "risk": 0.10, "access": 0.80 },
+    { "district": "Canal South", "kind": "green", "urbanized": false, "population": 68, "landValue": 114, "risk": 0.47, "access": 0.60 },
+    { "district": "Canal South", "kind": "green", "urbanized": false, "population": 64, "landValue": 112, "risk": 0.51, "access": 0.57 },
+
+    { "district": "South Ring", "kind": "suburban", "urbanized": true, "population": 226, "landValue": 176, "risk": 0.14, "access": 0.79 },
+    { "district": "South Ring", "kind": "suburban", "urbanized": true, "population": 220, "landValue": 172, "risk": 0.16, "access": 0.77 },
+    { "district": "South Ring", "kind": "green", "urbanized": false, "population": 84, "landValue": 126, "risk": 0.18, "access": 0.74 },
+    { "district": "South Ring", "kind": "green", "urbanized": false, "population": 80, "landValue": 122, "risk": 0.20, "access": 0.71 },
+    { "district": "Low Basin", "kind": "green", "urbanized": false, "population": 46, "landValue": 96, "risk": 0.68, "access": 0.42 },
+    { "district": "Low Basin", "kind": "green", "urbanized": false, "population": 43, "landValue": 92, "risk": 0.72, "access": 0.39 },
+
+    { "district": "Outer Arc", "kind": "green", "urbanized": false, "population": 88, "landValue": 132, "risk": 0.17, "access": 0.73 },
+    { "district": "Outer Arc", "kind": "green", "urbanized": false, "population": 84, "landValue": 128, "risk": 0.18, "access": 0.71 },
+    { "district": "Outer Arc", "kind": "green", "urbanized": false, "population": 81, "landValue": 124, "risk": 0.19, "access": 0.69 },
+    { "district": "Outer Arc", "kind": "green", "urbanized": false, "population": 78, "landValue": 118, "risk": 0.21, "access": 0.67 },
+    { "district": "Low Basin", "kind": "green", "urbanized": false, "population": 40, "landValue": 90, "risk": 0.74, "access": 0.36 },
+    { "district": "Low Basin", "kind": "green", "urbanized": false, "population": 38, "landValue": 88, "risk": 0.77, "access": 0.34 },
+
+    { "district": "Reserve Belt", "kind": "green", "urbanized": false, "population": 90, "landValue": 130, "risk": 0.22, "access": 0.68 },
+    { "district": "Reserve Belt", "kind": "green", "urbanized": false, "population": 86, "landValue": 126, "risk": 0.24, "access": 0.64 },
+    { "district": "Reserve Belt", "kind": "green", "urbanized": false, "population": 82, "landValue": 120, "risk": 0.26, "access": 0.61 },
+    { "district": "Reserve Belt", "kind": "green", "urbanized": false, "population": 76, "landValue": 116, "risk": 0.27, "access": 0.59 },
+    { "district": "Agri Fringe", "kind": "green", "urbanized": false, "population": 52, "landValue": 100, "risk": 0.30, "access": 0.50 },
+    { "district": "Agri Fringe", "kind": "green", "urbanized": false, "population": 48, "landValue": 96, "risk": 0.31, "access": 0.48 }
+  ]
+}
