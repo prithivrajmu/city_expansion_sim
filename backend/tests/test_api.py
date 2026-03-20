@@ -16,6 +16,8 @@ def make_strategy_scenario(district_strategies=None):
         residentDemand=0.66,
         developerPressure=0.74,
         infrastructureMomentum=0.71,
+        initialBudget=500,
+        initialPoliticalCapital=220,
         agentProfiles={
             "residents": {"mobility": 1.0, "housingUrgency": 1.0},
             "developers": {"capitalAggression": 1.0, "speculation": 1.0},
@@ -61,6 +63,8 @@ def test_session_tick_command_and_report_flow():
     payload = create_response.get_json()
     session_id = payload["sessionId"]
     assert payload["snapshot"]["metrics"]["urbanCells"] > 0
+    assert payload["snapshot"]["metrics"]["budget"] > 0
+    assert payload["snapshot"]["metrics"]["politicalCapital"] > 0
 
     command_response = client.post(
         f"/sessions/{session_id}/commands",
@@ -84,6 +88,7 @@ def test_session_tick_command_and_report_flow():
     assert "comparison" in report
     assert "districtComparison" in report
     assert "interventionROI" in report
+    assert "resources" in report
 
 
 def test_save_load_and_replay_flow():
@@ -199,3 +204,33 @@ def test_report_exposes_baseline_deltas_and_intervention_roi():
     assert report["comparison"]["currentTick"] == 2
     assert any(item["district"] == "Outer Arc" for item in report["districtComparison"])
     assert any(item["type"] == "build_transit" for item in report["interventionROI"])
+
+
+def test_intervention_requires_budget_and_political_capital():
+    session = SimulationSession(
+        make_strategy_scenario(
+            {
+                "Growth District": {"mode": "growth_first"},
+                "Resilience District": {"mode": "resilience_first"},
+            }
+        )
+    )
+    session.budget = 10
+    session.political_capital = 5
+
+    try:
+        session.apply_command({"type": "build_transit", "district": "Growth District", "strength": 0.2})
+        assert False, "Expected insufficient-resource error"
+    except ValueError as error:
+        assert "Insufficient" in str(error)
+
+
+def test_tick_replenishes_budget_and_political_capital():
+    session = SimulationSession(make_strategy_scenario())
+    baseline_budget = session.budget
+    baseline_political = session.political_capital
+
+    session.tick()
+
+    assert session.budget > baseline_budget
+    assert session.political_capital > baseline_political

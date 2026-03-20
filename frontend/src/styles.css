@@ -276,6 +276,15 @@ h1 {
   font-size: 0.8rem;
 }
 
+.cost-strip {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.78rem;
+  color: #31463e;
+}
+
 .range {
   width: 100%;
 }
@@ -337,6 +346,10 @@ h1 {
 
 .comparison-metrics strong {
   font-size: 1.2rem;
+}
+
+.warning-copy {
+  color: #8b4027;
 }
 
 @media (max-width: 960px) {

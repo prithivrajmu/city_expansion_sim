@@ -21,6 +21,10 @@ type Intervention = {
   strength: number;
   tick: number;
   touched: number;
+  cost?: {
+    budget: number;
+    politicalCapital: number;
+  };
 };
 
 type Cell = {
@@ -51,6 +55,8 @@ type Snapshot = {
     developerPressure: number;
     governmentPressure: number;
     eventCount: number;
+    budget: number;
+    politicalCapital: number;
   };
   grid: Cell[];
   events: string[];
@@ -123,6 +129,12 @@ type Report = {
     riskDelta: number;
     efficiency: number;
   }>;
+  resources: {
+    budget: number;
+    politicalCapital: number;
+    startingBudget: number;
+    startingPoliticalCapital: number;
+  };
 };
 
 const apiBase = "http://localhost:5001";
@@ -161,13 +173,55 @@ const metricCards = computed(() => {
     { label: "Avg. Access", value: String(metrics.averageAccess) },
     { label: "Avg. Risk", value: String(metrics.averageRisk) },
     { label: "Resident Pressure", value: String(metrics.residentPressure) },
-    { label: "Developer Pressure", value: String(metrics.developerPressure) }
+    { label: "Developer Pressure", value: String(metrics.developerPressure) },
+    { label: "Budget", value: metrics.budget.toLocaleString() },
+    { label: "Political Capital", value: metrics.politicalCapital.toLocaleString() }
   ];
 });
 
 const districtOptions = computed(() => session.value?.snapshot.districts ?? []);
 const topDistrictDeltas = computed(() => report.value?.districtComparison.slice(0, 4) ?? []);
 const topInterventionROI = computed(() => report.value?.interventionROI.slice().reverse().slice(0, 4) ?? []);
+const selectedDistrictCellCount = computed(() => {
+  if (!session.value || !selectedDistrict.value) {
+    return 0;
+  }
+  return session.value.snapshot.grid.filter(
+    (cell) => cell.district === selectedDistrict.value && cell.kind !== "water"
+  ).length;
+});
+const commandCost = computed(() => {
+  const touched = selectedDistrictCellCount.value;
+  if (!touched) {
+    return { budget: 0, politicalCapital: 0 };
+  }
+
+  const factors: Record<
+    string,
+    { budget: number; politicalCapital: number; strengthBudget: number; strengthPoliticalCapital: number }
+  > = {
+    build_transit: { budget: 24, politicalCapital: 8, strengthBudget: 180, strengthPoliticalCapital: 60 },
+    upzone_district: { budget: 14, politicalCapital: 11, strengthBudget: 120, strengthPoliticalCapital: 90 },
+    flood_barrier: { budget: 18, politicalCapital: 9, strengthBudget: 160, strengthPoliticalCapital: 70 }
+  };
+
+  const factor = factors[selectedCommand.value];
+  return {
+    budget: Math.round((factor.budget * touched) + (commandStrength.value * factor.strengthBudget)),
+    politicalCapital: Math.round(
+      (factor.politicalCapital * touched) + (commandStrength.value * factor.strengthPoliticalCapital)
+    )
+  };
+});
+const canAffordCommand = computed(() => {
+  if (!session.value) {
+    return false;
+  }
+  return (
+    session.value.snapshot.metrics.budget >= commandCost.value.budget &&
+    session.value.snapshot.metrics.politicalCapital >= commandCost.value.politicalCapital
+  );
+});
 
 async function fetchScenarios() {
   const response = await fetch(`${apiBase}/scenarios`);
@@ -526,14 +580,30 @@ onMounted(async () => {
               Strength {{ commandStrength.toFixed(2) }}
               <input v-model="commandStrength" class="range" type="range" min="0.05" max="0.25" step="0.01" />
             </label>
-            <button class="button button-primary" :disabled="loading || !!replayState" @click="applyCommand">
+            <div class="cost-strip">
+              <span>Budget {{ commandCost.budget }}</span>
+              <span>Policy {{ commandCost.politicalCapital }}</span>
+            </div>
+            <button
+              class="button button-primary"
+              :disabled="loading || !!replayState || !canAffordCommand"
+              @click="applyCommand"
+            >
               Apply Intervention
             </button>
           </div>
+          <p class="support-copy">
+            Remaining resources: budget {{ session.snapshot.metrics.budget }} | political capital
+            {{ session.snapshot.metrics.politicalCapital }}
+          </p>
+          <p v-if="!canAffordCommand" class="support-copy warning-copy">
+            This intervention is blocked until you recover enough budget and political capital.
+          </p>
 
           <ul class="event-list compact-list">
             <li v-for="entry in session.snapshot.interventions.slice().reverse()" :key="`${entry.tick}-${entry.type}-${entry.district}`">
-              {{ commandLabel(entry.type) }} in {{ entry.district }} at tick {{ entry.tick }}
+              {{ commandLabel(entry.type) }} in {{ entry.district }} at tick {{ entry.tick }} |
+              budget {{ entry.cost?.budget ?? 0 }} | policy {{ entry.cost?.politicalCapital ?? 0 }}
             </li>
           </ul>
 

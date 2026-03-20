@@ -39,6 +39,12 @@ DISTRICT_STRATEGY_PRESETS = {
     },
 }
 
+COMMAND_COST_FACTORS = {
+    "build_transit": {"budget": 24, "politicalCapital": 8, "strengthBudget": 180, "strengthPoliticalCapital": 60},
+    "upzone_district": {"budget": 14, "politicalCapital": 11, "strengthBudget": 120, "strengthPoliticalCapital": 90},
+    "flood_barrier": {"budget": 18, "politicalCapital": 9, "strengthBudget": 160, "strengthPoliticalCapital": 70},
+}
+
 
 @dataclass
 class CellSnapshot:
@@ -79,6 +85,8 @@ class Scenario:
     residentDemand: float
     developerPressure: float
     infrastructureMomentum: float
+    initialBudget: int
+    initialPoliticalCapital: int
     agentProfiles: dict
     events: list[dict]
     cells: list[dict]
@@ -101,6 +109,8 @@ class SimulationSession:
         self.tick_count = 0
         self.cells = [cell.copy() for cell in scenario.cells]
         self.interventions: list[dict] = []
+        self.budget = scenario.initialBudget
+        self.political_capital = scenario.initialPoliticalCapital
         self.events: list[str] = [
             f"Scenario '{scenario.name}' initialized with {len(self.cells)} cells."
         ]
@@ -160,6 +170,7 @@ class SimulationSession:
 
         self.cells = next_cells
         self.tick_count += 1
+        self._replenish_resources()
         year = self._current_year()
         self.events.append(
             f"Tick {self.tick_count}: {conversions} cells urbanized, corridor pressure at year {year}."
@@ -174,6 +185,31 @@ class SimulationSession:
 
         if command_type not in {"upzone_district", "build_transit", "flood_barrier"}:
             raise ValueError(f"Unsupported command type: {command_type}")
+
+        touched = 0
+        for cell in self.cells:
+            if district and cell["district"] != district:
+                continue
+            if cell["kind"] == "water":
+                continue
+            touched += 1
+
+        if touched == 0:
+            raise ValueError("Command requires at least one non-water cell in the selected district")
+
+        cost = self.command_cost(command_type, touched, strength)
+        if self.budget < cost["budget"]:
+            raise ValueError(
+                f"Insufficient budget for {command_type}: need {cost['budget']}, have {self.budget}"
+            )
+        if self.political_capital < cost["politicalCapital"]:
+            raise ValueError(
+                "Insufficient political capital for "
+                f"{command_type}: need {cost['politicalCapital']}, have {self.political_capital}"
+            )
+
+        self.budget -= cost["budget"]
+        self.political_capital -= cost["politicalCapital"]
 
         touched = 0
         for cell in self.cells:
@@ -200,11 +236,13 @@ class SimulationSession:
             "strength": round(strength, 2),
             "tick": self.tick_count,
             "touched": touched,
+            "cost": cost,
         }
         self.interventions.append(applied)
         self.interventions = self.interventions[-12:]
         self.events.append(
-            f"Command applied: {command_type} in {applied['district']} touching {touched} cells."
+            f"Command applied: {command_type} in {applied['district']} touching {touched} cells "
+            f"for budget {cost['budget']} and political capital {cost['politicalCapital']}."
         )
         self.events = self.events[-10:]
         self._record_history()
@@ -256,6 +294,8 @@ class SimulationSession:
             "developerPressure": self._developer_pressure(),
             "governmentPressure": self._government_pressure(),
             "eventCount": len(self.applied_events),
+            "budget": self.budget,
+            "politicalCapital": self.political_capital,
         }
 
     def districts(self) -> list[str]:
@@ -319,6 +359,22 @@ class SimulationSession:
     def _scaled_value(self, base: float, multiplier: float) -> int:
         return int(round(base * multiplier))
 
+    def command_cost(self, command_type: str, touched: int, strength: float) -> dict[str, int]:
+        factors = COMMAND_COST_FACTORS[command_type]
+        return {
+            "budget": int(round((factors["budget"] * touched) + (strength * factors["strengthBudget"]))),
+            "politicalCapital": int(
+                round((factors["politicalCapital"] * touched) + (strength * factors["strengthPoliticalCapital"]))
+            ),
+        }
+
+    def _replenish_resources(self) -> None:
+        government = self.scenario.agentProfiles.get("government", {})
+        budget_gain = max(6, int(round(16 * self._government_pressure())))
+        political_gain = max(3, int(round(8 * government.get("coordination", 1.0))))
+        self.budget += budget_gain
+        self.political_capital += political_gain
+
     def _apply_scheduled_events(self) -> None:
         next_tick = self.tick_count + 1
         due_events = [event for event in self.scenario.events if event["tick"] == next_tick]
@@ -360,6 +416,7 @@ class SimulationSession:
             "events": list(self.events),
             "interventions": list(self.interventions),
             "scenarioEvents": list(self.applied_events),
+            "resources": {"budget": self.budget, "politicalCapital": self.political_capital},
         }
         if self.history and self.history[-1]["tick"] == self.tick_count:
             self.history[-1] = entry
@@ -417,6 +474,7 @@ class SimulationSession:
             "appliedEvents": list(self.applied_events),
             "events": list(self.events),
             "history": self.history,
+            "resources": {"budget": self.budget, "politicalCapital": self.political_capital},
         }
 
     @classmethod
@@ -428,6 +486,11 @@ class SimulationSession:
         session.interventions = list(state["interventions"])
         session.applied_events = list(state.get("appliedEvents", []))
         session.events = list(state["events"])
+        resources = state.get("resources", {})
+        session.budget = resources.get("budget", scenario.initialBudget)
+        session.political_capital = resources.get(
+            "politicalCapital", scenario.initialPoliticalCapital
+        )
         session.history = list(state.get("history", [])) or []
         if not session.history:
             session._record_history()
@@ -454,6 +517,7 @@ class SimulationSession:
                 f"{metrics['interventionCount']} interventions have been applied in this session.",
                 f"Resident pressure is {metrics['residentPressure']}, developer pressure is {metrics['developerPressure']}, and government pressure is {metrics['governmentPressure']}.",
                 f"Compared with baseline, population changed by {comparison['populationDelta']} and average land value changed by {comparison['averageLandValueDelta']}.",
+                f"Remaining budget is {metrics['budget']} and political capital is {metrics['politicalCapital']}.",
             ],
             "growthFrontier": [
                 {
@@ -480,6 +544,12 @@ class SimulationSession:
             "comparison": comparison,
             "districtComparison": self._district_comparison(baseline_entry),
             "interventionROI": self._intervention_roi(),
+            "resources": {
+                "budget": self.budget,
+                "politicalCapital": self.political_capital,
+                "startingBudget": self.scenario.initialBudget,
+                "startingPoliticalCapital": self.scenario.initialPoliticalCapital,
+            },
         }
 
     def _comparison_metrics(self, baseline_entry: dict | None) -> dict:

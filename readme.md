@@ -53,7 +53,8 @@ The repo now includes a runnable vertical slice:
 - Flask backend session API on `http://localhost:5001`
 - Vue/Vite frontend on `http://localhost:3000`
 - deterministic city-growth simulation with scenario seeding
-- district intervention commands and generated decision reports
+- district intervention commands, constrained by budget and political capital
+- baseline-vs-run comparison views and intervention ROI reporting
 - multiple scenarios for cross-scenario runs
 - saved sessions and replayable timeline history
 - `prstack` as the intended bootstrap and dev entrypoint

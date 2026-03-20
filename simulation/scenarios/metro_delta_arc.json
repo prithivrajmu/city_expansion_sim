@@ -11,6 +11,8 @@
   "residentDemand": 0.66,
   "developerPressure": 0.74,
   "infrastructureMomentum": 0.71,
+  "initialBudget": 580,
+  "initialPoliticalCapital": 260,
   "agentProfiles": {
     "residents": { "mobility": 1.04, "housingUrgency": 1.01 },
     "developers": { "capitalAggression": 1.12, "speculation": 1.08 },
