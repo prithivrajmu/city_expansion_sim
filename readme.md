@@ -30,6 +30,7 @@ The local workspace did not contain copies of the referenced inspiration repos.
 Pinned upstream references so far:
 
 - orchestration reference: `github.com/garrytan/gstack`
+- workflow stack: `github.com/prithivrajmu/prstack`
 - architecture reference: `github.com/volcengine/OpenViking`
 - simulation reference: `github.com/666ghj/MiroFish`
 

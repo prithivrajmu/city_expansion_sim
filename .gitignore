@@ -4,6 +4,7 @@ backend/.venv/
 frontend/dist/
 simulation/saves/*.json
 .ralph/
+.prstack/state/
 __pycache__/
 *.pyc
 .DS_Store
