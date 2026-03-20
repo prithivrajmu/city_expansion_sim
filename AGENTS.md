@@ -7,8 +7,9 @@
 - Flask backend in `backend/`
 - Vue/Vite frontend in `frontend/`
 - simulation runtime in `simulation/`
-- workflow stack in `ops/prstack/`
+- workflow shim in `ops/prstack/` backed by the external `prstack` repo
 - optional Ralph loop in `.agents/ralph/`
+- local `prstack` config and state in `.prstack/`
 
 ## Normal Workflow
 
@@ -39,6 +40,6 @@ If backend or simulation files changed, ensure:
 ## Guardrails
 
 - Do not rewrite legacy files in `legacy/` unless the story explicitly calls for it.
-- Prefer changes in active runtime paths: `backend/`, `frontend/`, `simulation/`, `shared/`, `ops/prstack/`.
+- Prefer changes in active runtime paths: `backend/`, `frontend/`, `simulation/`, `shared/`, `.prstack/`, and the shim in `ops/prstack/` only when the entrypoint itself must change.
 - Keep `prstack` as the main workflow layer. Ralph is an execution loop within that layer, not a replacement for it.
 - Do not run unbounded loops. Use bounded Ralph iterations only.

@@ -60,6 +60,8 @@ The repo now includes a runnable vertical slice:
 - saved sessions and replayable timeline history
 - `prstack` as the intended bootstrap and dev entrypoint
 
+`./ops/prstack/bin/prstack` is now a shim to the standalone workflow repo `github.com/prithivrajmu/prstack`, with project config and generated state stored under `.prstack/`.
+
 Run it with:
 
 ```bash

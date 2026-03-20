@@ -10,7 +10,7 @@ After inspecting that repo, the important conclusion is that `gstack` is primari
 
 - this repo is being rebuilt from scratch
 - the current work is architecture-heavy and iteration-heavy
-- the orchestration needs to be repo-local and easy to inspect
+- the orchestration state needs to stay repo-local and easy to inspect
 - agent assumptions should be explicit rather than hidden in external tooling
 - `gstack` is optimized around Claude slash-command skills and `.claude/` installation patterns
 
@@ -57,12 +57,12 @@ These parts should stay out unless there is a strong reason:
 
 ```text
 ops/prstack/
-├── bin/
-│   └── prstack
-├── state/
-│   ├── mission.md
-│   └── tasks.md
-└── templates/
+└── bin/
+    └── prstack   # shim into the standalone prstack repo
+
+.prstack/
+├── project.env
+└── state/
     ├── mission.md
     └── tasks.md
 ```
@@ -71,11 +71,13 @@ ops/prstack/
 
 Recommended loop:
 
-1. define the current mission in `ops/prstack/state/mission.md`
-2. maintain the active backlog in `ops/prstack/state/tasks.md`
+1. define the current mission in `.prstack/state/mission.md`
+2. maintain the active backlog in `.prstack/state/tasks.md`
 3. use Codex to execute one slice at a time
 4. update task state after each implemented slice
 5. keep architecture notes in `docs/`
+
+The command surface inside this repo stays `./ops/prstack/bin/prstack`, but the implementation now lives in the standalone `prstack` repo.
 
 ## Next Evolution
 

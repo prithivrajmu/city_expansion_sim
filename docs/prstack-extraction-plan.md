@@ -1,10 +1,15 @@
 # prstack Extraction Plan
 
-`prstack` should move from repo-local helper to a reusable Codex-native workflow stack that other projects can adopt.
+`prstack` has now moved from repo-local helper to a reusable Codex-native workflow stack that other projects can adopt.
 
 ## Goal
 
 Split `prstack` into its own publishable repository while keeping `city_expansion_sim` as the proving ground.
+
+Status:
+
+- standalone repo created at `github.com/prithivrajmu/prstack`
+- `city_expansion_sim` now uses a local shim plus `.prstack/project.env`
 
 ## Scope
 
