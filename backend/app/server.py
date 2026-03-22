@@ -8,6 +8,8 @@ from .store import SESSION_STORE
 app = Flask(__name__)
 CORS(app)
 
+SUPPORTED_COMMANDS = {"upzone_district", "build_transit", "flood_barrier"}
+
 
 @app.errorhandler(KeyError)
 def handle_missing_key(error: KeyError):
@@ -22,6 +24,64 @@ def handle_missing_file(error: FileNotFoundError):
 @app.errorhandler(ValueError)
 def handle_bad_request(error: ValueError):
     return jsonify({"error": "bad_request", "message": str(error)}), 400
+
+
+@app.errorhandler(TypeError)
+def handle_type_error(error: TypeError):
+    return jsonify({"error": "bad_request", "message": str(error)}), 400
+
+
+def require_json_object() -> dict:
+    payload = request.get_json(silent=True)
+    if payload is None:
+        return {}
+    if not isinstance(payload, dict):
+        raise ValueError("Request body must be a JSON object")
+    return payload
+
+
+def parse_string(value: object, field_name: str) -> str:
+    if not isinstance(value, str):
+        raise ValueError(f"{field_name} must be a string")
+    cleaned = value.strip()
+    if not cleaned:
+        raise ValueError(f"{field_name} must not be empty")
+    return cleaned
+
+
+def parse_steps(payload: dict) -> int:
+    value = payload.get("steps", 1)
+    if not isinstance(value, int):
+        raise ValueError("steps must be an integer")
+    if value < 1 or value > 24:
+        raise ValueError("steps must be between 1 and 24")
+    return value
+
+
+def parse_command(payload: dict) -> dict:
+    command_type = parse_string(payload.get("type"), "type")
+    if command_type not in SUPPORTED_COMMANDS:
+        raise ValueError(f"Unsupported command type: {command_type}")
+
+    district = parse_string(payload.get("district"), "district")
+    strength = payload.get("strength", 0.08)
+    if not isinstance(strength, (int, float)):
+        raise ValueError("strength must be a number")
+    strength = float(strength)
+    if strength < 0.01 or strength > 0.5:
+        raise ValueError("strength must be between 0.01 and 0.5")
+
+    return {"type": command_type, "district": district, "strength": strength}
+
+
+def parse_optional_label(payload: dict) -> str | None:
+    label = payload.get("label")
+    if label is None:
+        return None
+    label = parse_string(label, "label")
+    if len(label) > 64:
+        raise ValueError("label must be 64 characters or fewer")
+    return label
 
 
 @app.get("/health")
@@ -41,8 +101,10 @@ def saves():
 
 @app.post("/sessions")
 def create_session():
-    payload = request.get_json(silent=True) or {}
+    payload = require_json_object()
     scenario_id = payload.get("scenarioId", "chennai_coastal_corridor")
+    if not isinstance(scenario_id, str):
+        raise ValueError("scenarioId must be a string")
     session = SESSION_STORE.create_session(scenario_id)
     return jsonify(session.to_payload()), 201
 
@@ -55,15 +117,15 @@ def get_state(session_id: str):
 
 @app.post("/sessions/<session_id>/tick")
 def tick(session_id: str):
-    payload = request.get_json(silent=True) or {}
-    steps = max(1, min(int(payload.get("steps", 1)), 24))
+    payload = require_json_object()
+    steps = parse_steps(payload)
     session = SESSION_STORE.tick(session_id, steps)
     return jsonify(session.to_payload())
 
 
 @app.post("/sessions/<session_id>/commands")
 def apply_command(session_id: str):
-    payload = request.get_json(silent=True) or {}
+    payload = parse_command(require_json_object())
     session = SESSION_STORE.apply_command(session_id, payload)
     return jsonify(session.to_payload())
 
@@ -91,8 +153,8 @@ def replay(session_id: str, tick: int):
 
 @app.post("/sessions/<session_id>/save")
 def save_session(session_id: str):
-    payload = request.get_json(silent=True) or {}
-    return jsonify(SESSION_STORE.save_session(session_id, payload.get("label"))), 201
+    payload = require_json_object()
+    return jsonify(SESSION_STORE.save_session(session_id, parse_optional_label(payload))), 201
 
 
 @app.post("/saves/<save_id>/load")

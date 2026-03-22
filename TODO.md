@@ -14,7 +14,7 @@
 
 - [x] Choose the runtime stack for backend and frontend
 - [x] Define shared simulation state and command schemas
-- [ ] Decide whether the world model is tile-based, district-based, or hybrid
+- [x] Decide whether the world model is tile-based, district-based, or hybrid
 - [x] Define turn/tick progression and save/load format
 - [x] Map `MiroFish` concepts into a city-expansion domain model
 

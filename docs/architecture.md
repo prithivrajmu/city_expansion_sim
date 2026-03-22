@@ -49,6 +49,18 @@ Responsibilities:
 
 This layer should be framework-light and deterministic where possible.
 
+## World Model Decision
+
+The shipping world model is now district-based.
+
+That decision is intentional:
+
+- district simulation is easier to read, balance, and explain
+- the current product loop is about policy tradeoffs and scenario outcomes, not parcel fidelity
+- replay, comparison, objectives, and intervention ROI all work better with stable district summaries
+
+A hybrid overlay can still happen later, but only as an extension on top of district logic rather than a replacement for it.
+
 ### 2. Scenarios
 
 `simulation/scenarios/`

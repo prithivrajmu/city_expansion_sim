@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sys
 import uuid
+from collections import OrderedDict
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -31,8 +32,9 @@ class SessionEnvelope:
 
 
 class SessionStore:
-    def __init__(self) -> None:
-        self._sessions: dict[str, SimulationSession] = {}
+    def __init__(self, max_sessions: int = 12) -> None:
+        self._sessions: OrderedDict[str, SimulationSession] = OrderedDict()
+        self._max_sessions = max_sessions
         SAVES_DIR.mkdir(parents=True, exist_ok=True)
 
     def list_scenarios(self) -> list[dict]:
@@ -55,40 +57,41 @@ class SessionStore:
         scenario_path = self._scenario_path(scenario_id)
         session_id = str(uuid.uuid4())
         session = create_session_from_scenario(scenario_path)
+        self._ensure_capacity()
         self._sessions[session_id] = session
         return SessionEnvelope(session_id=session_id, scenario_id=scenario_id, snapshot=session.snapshot())
 
     def get_session(self, session_id: str) -> SessionEnvelope:
-        session = self._sessions[session_id]
+        session = self._get_session(session_id)
         return SessionEnvelope(session_id=session_id, scenario_id=session.scenario.id, snapshot=session.snapshot())
 
     def tick(self, session_id: str, steps: int) -> SessionEnvelope:
-        session = self._sessions[session_id]
+        session = self._get_session(session_id)
         for _ in range(steps):
             session.tick()
         return SessionEnvelope(session_id=session_id, scenario_id=session.scenario.id, snapshot=session.snapshot())
 
     def apply_command(self, session_id: str, payload: dict) -> SessionEnvelope:
-        session = self._sessions[session_id]
+        session = self._get_session(session_id)
         session.apply_command(payload)
         return SessionEnvelope(session_id=session_id, scenario_id=session.scenario.id, snapshot=session.snapshot())
 
     def report(self, session_id: str) -> dict:
-        session = self._sessions[session_id]
+        session = self._get_session(session_id)
         return session.report()
 
     def timeline(self, session_id: str) -> list[dict]:
-        session = self._sessions[session_id]
+        session = self._get_session(session_id)
         return [asdict(entry) for entry in session.timeline()]
 
     def replay(self, session_id: str, tick: int) -> dict:
-        session = self._sessions[session_id]
+        session = self._get_session(session_id)
         replay = session.replay(tick)
         replay["grid"] = [asdict(cell) for cell in replay["grid"]]
         return replay
 
     def save_session(self, session_id: str, label: str | None = None) -> dict:
-        session = self._sessions[session_id]
+        session = self._get_session(session_id)
         save_id = label or f"{session.scenario.id}-tick-{session.tick_count}"
         safe_id = self._normalize_identifier(save_id)
         path = SAVES_DIR / f"{safe_id}.json"
@@ -123,8 +126,18 @@ class SessionStore:
             payload = json.load(handle)
         session_id = str(uuid.uuid4())
         session = SimulationSession.from_state(payload["state"])
+        self._ensure_capacity()
         self._sessions[session_id] = session
         return SessionEnvelope(session_id=session_id, scenario_id=session.scenario.id, snapshot=session.snapshot())
+
+    def _get_session(self, session_id: str) -> SimulationSession:
+        session = self._sessions[session_id]
+        self._sessions.move_to_end(session_id)
+        return session
+
+    def _ensure_capacity(self) -> None:
+        while len(self._sessions) >= self._max_sessions:
+            self._sessions.popitem(last=False)
 
     def _scenario_path(self, scenario_id: str) -> Path:
         safe_id = self._normalize_identifier(scenario_id)

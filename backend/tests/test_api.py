@@ -1,4 +1,5 @@
 from app.server import app
+from app.store import SESSION_STORE
 from simulation.core.engine import Scenario, SimulationSession
 
 
@@ -254,3 +255,39 @@ def test_report_exposes_objective_progress_and_evaluation():
     assert report["evaluation"]["tick"] == 8
     assert report["evaluation"]["status"] in {"success", "at_risk"}
     assert len(report["objectives"]) == 3
+
+
+def test_invalid_tick_payload_returns_400():
+    client = app.test_client()
+    create_response = client.post("/sessions", json={"scenarioId": "metro_delta_arc"})
+    session_id = create_response.get_json()["sessionId"]
+
+    response = client.post(f"/sessions/{session_id}/tick", json={"steps": "three"})
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "bad_request"
+
+
+def test_invalid_command_payload_returns_400():
+    client = app.test_client()
+    create_response = client.post("/sessions", json={"scenarioId": "metro_delta_arc"})
+    session_id = create_response.get_json()["sessionId"]
+
+    response = client.post(
+        f"/sessions/{session_id}/commands",
+        json={"type": "build_transit", "district": "Outer Arc", "strength": "high"},
+    )
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "bad_request"
+
+
+def test_session_store_evicts_old_sessions_when_capacity_is_reached():
+    SESSION_STORE._sessions.clear()
+    first_session_id = client = None
+    for index in range(SESSION_STORE._max_sessions + 1):
+        payload = app.test_client().post("/sessions", json={"scenarioId": "metro_delta_arc"}).get_json()
+        if index == 0:
+            first_session_id = payload["sessionId"]
+
+    assert first_session_id is not None
+    response = app.test_client().get(f"/sessions/{first_session_id}/state")
+    assert response.status_code == 404
