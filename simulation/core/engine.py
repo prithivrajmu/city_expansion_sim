@@ -85,6 +85,8 @@ class Scenario:
     residentDemand: float
     developerPressure: float
     infrastructureMomentum: float
+    horizonTicks: int
+    objectives: list[dict]
     initialBudget: int
     initialPoliticalCapital: int
     agentProfiles: dict
@@ -296,6 +298,7 @@ class SimulationSession:
             "eventCount": len(self.applied_events),
             "budget": self.budget,
             "politicalCapital": self.political_capital,
+            "ticksRemaining": max(0, self.scenario.horizonTicks - self.tick_count),
         }
 
     def districts(self) -> list[str]:
@@ -506,6 +509,8 @@ class SimulationSession:
         )[:3]
         risk_zones = sorted(self.cells, key=lambda cell: cell["risk"], reverse=True)[:3]
         comparison = self._comparison_metrics(baseline_entry)
+        objective_progress = self._objective_progress(metrics)
+        evaluation = self._evaluation(objective_progress)
         return {
             "headline": (
                 f"{self.scenario.name} at year {self._current_year()} has "
@@ -518,6 +523,7 @@ class SimulationSession:
                 f"Resident pressure is {metrics['residentPressure']}, developer pressure is {metrics['developerPressure']}, and government pressure is {metrics['governmentPressure']}.",
                 f"Compared with baseline, population changed by {comparison['populationDelta']} and average land value changed by {comparison['averageLandValueDelta']}.",
                 f"Remaining budget is {metrics['budget']} and political capital is {metrics['politicalCapital']}.",
+                f"{metrics['ticksRemaining']} ticks remain before end-of-horizon evaluation.",
             ],
             "growthFrontier": [
                 {
@@ -550,6 +556,59 @@ class SimulationSession:
                 "startingBudget": self.scenario.initialBudget,
                 "startingPoliticalCapital": self.scenario.initialPoliticalCapital,
             },
+            "objectives": objective_progress,
+            "evaluation": evaluation,
+        }
+
+    def _objective_progress(self, metrics: dict) -> list[dict]:
+        items: list[dict] = []
+        for objective in self.scenario.objectives:
+            metric = objective["metric"]
+            target = objective["target"]
+            comparator = objective.get("comparator", "at_least")
+            current = metrics.get(metric)
+            if current is None:
+                continue
+            passed = current >= target if comparator == "at_least" else current <= target
+            if comparator == "at_least":
+                progress = min(1.0, round(current / target, 3)) if target else 1.0
+            else:
+                progress = 1.0 if current <= target else max(0.0, round(target / current, 3))
+            items.append(
+                {
+                    "id": objective["id"],
+                    "title": objective["title"],
+                    "metric": metric,
+                    "current": current,
+                    "target": target,
+                    "comparator": comparator,
+                    "passed": passed,
+                    "progress": progress,
+                }
+            )
+        return items
+
+    def _evaluation(self, objective_progress: list[dict]) -> dict:
+        horizon_reached = self.tick_count >= self.scenario.horizonTicks
+        passed_count = sum(1 for item in objective_progress if item["passed"])
+        total_count = len(objective_progress)
+        if not horizon_reached:
+            status = "in_progress"
+            headline = f"{max(0, self.scenario.horizonTicks - self.tick_count)} ticks remain before evaluation."
+        elif total_count > 0 and passed_count == total_count:
+            status = "success"
+            headline = "All scenario objectives cleared at the evaluation horizon."
+        else:
+            status = "at_risk"
+            headline = f"{passed_count} of {total_count} objectives cleared at the evaluation horizon."
+
+        return {
+            "status": status,
+            "headline": headline,
+            "horizonTicks": self.scenario.horizonTicks,
+            "tick": self.tick_count,
+            "passedObjectives": passed_count,
+            "totalObjectives": total_count,
         }
 
     def _comparison_metrics(self, baseline_entry: dict | None) -> dict:

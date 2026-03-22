@@ -135,6 +135,24 @@ type Report = {
     startingBudget: number;
     startingPoliticalCapital: number;
   };
+  objectives: Array<{
+    id: string;
+    title: string;
+    metric: string;
+    current: number;
+    target: number;
+    comparator: string;
+    passed: boolean;
+    progress: number;
+  }>;
+  evaluation: {
+    status: string;
+    headline: string;
+    horizonTicks: number;
+    tick: number;
+    passedObjectives: number;
+    totalObjectives: number;
+  };
 };
 
 const apiBase = "http://localhost:5001";
@@ -392,6 +410,10 @@ function formatSigned(value: number) {
   return value > 0 ? `+${value}` : `${value}`;
 }
 
+function formatObjectiveValue(value: number) {
+  return Number.isInteger(value) ? value.toLocaleString() : value.toFixed(3);
+}
+
 watch(replayTick, async (value) => {
   await fetchReplay(value);
 });
@@ -554,6 +576,36 @@ onMounted(async () => {
             <li v-for="item in topDistrictDeltas" :key="item.district">
               {{ item.district }} | pop {{ formatSigned(item.populationDelta) }} | value {{ formatSigned(item.landValueDelta) }} |
               urban {{ formatSigned(item.urbanCellsDelta) }}
+            </li>
+          </ul>
+        </div>
+
+        <div v-if="report" class="panel">
+          <div class="panel-header">
+            <div>
+              <p class="panel-kicker">Objectives</p>
+              <h2>Scenario Scorecard</h2>
+            </div>
+            <span class="pill" :class="`pill-${report.evaluation.status}`">
+              {{ report.evaluation.status }}
+            </span>
+          </div>
+          <p class="panel-copy report-headline">{{ report.evaluation.headline }}</p>
+          <p class="focus-line">
+            Cleared {{ report.evaluation.passedObjectives }} / {{ report.evaluation.totalObjectives }}
+            objectives by tick {{ report.evaluation.tick }} of {{ report.evaluation.horizonTicks }}
+          </p>
+          <ul class="event-list compact-list">
+            <li
+              v-for="objective in report.objectives"
+              :key="objective.id"
+              :class="{ 'objective-pass': objective.passed }"
+            >
+              {{ objective.title }} |
+              {{ formatObjectiveValue(objective.current) }}
+              {{ objective.comparator === "at_least" ? ">=" : "<=" }}
+              {{ formatObjectiveValue(objective.target) }} |
+              progress {{ objective.progress }}
             </li>
           </ul>
         </div>

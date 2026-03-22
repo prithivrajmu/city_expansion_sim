@@ -16,6 +16,11 @@ def make_strategy_scenario(district_strategies=None):
         residentDemand=0.66,
         developerPressure=0.74,
         infrastructureMomentum=0.71,
+        horizonTicks=4,
+        objectives=[
+            {"id": "growth", "title": "Grow district population", "metric": "population", "target": 4200, "comparator": "at_least"},
+            {"id": "risk", "title": "Keep risk controlled", "metric": "averageRisk", "target": 0.3, "comparator": "at_most"},
+        ],
         initialBudget=500,
         initialPoliticalCapital=220,
         agentProfiles={
@@ -89,6 +94,8 @@ def test_session_tick_command_and_report_flow():
     assert "districtComparison" in report
     assert "interventionROI" in report
     assert "resources" in report
+    assert "objectives" in report
+    assert "evaluation" in report
 
 
 def test_save_load_and_replay_flow():
@@ -234,3 +241,16 @@ def test_tick_replenishes_budget_and_political_capital():
 
     assert session.budget > baseline_budget
     assert session.political_capital > baseline_political
+
+
+def test_report_exposes_objective_progress_and_evaluation():
+    client = app.test_client()
+    create_response = client.post("/sessions", json={"scenarioId": "chennai_coastal_corridor"})
+    session_id = create_response.get_json()["sessionId"]
+
+    client.post(f"/sessions/{session_id}/tick", json={"steps": 8})
+    report = client.get(f"/sessions/{session_id}/report").get_json()
+
+    assert report["evaluation"]["tick"] == 8
+    assert report["evaluation"]["status"] in {"success", "at_risk"}
+    assert len(report["objectives"]) == 3

@@ -11,6 +11,12 @@
   "residentDemand": 0.66,
   "developerPressure": 0.74,
   "infrastructureMomentum": 0.71,
+  "horizonTicks": 8,
+  "objectives": [
+    { "id": "population", "title": "Grow the metro arc population", "metric": "population", "target": 4700, "comparator": "at_least" },
+    { "id": "access", "title": "Raise infrastructure access", "metric": "averageAccess", "target": 0.71, "comparator": "at_least" },
+    { "id": "risk", "title": "Contain basin risk", "metric": "averageRisk", "target": 0.28, "comparator": "at_most" }
+  ],
   "initialBudget": 580,
   "initialPoliticalCapital": 260,
   "agentProfiles": {

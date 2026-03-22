@@ -204,6 +204,18 @@ h1 {
   font-size: 0.75rem;
 }
 
+.pill-success {
+  background: rgba(20, 113, 93, 0.12);
+}
+
+.pill-at_risk {
+  background: rgba(183, 126, 78, 0.18);
+}
+
+.pill-in_progress {
+  background: rgba(232, 197, 119, 0.24);
+}
+
 .city-grid {
   display: grid;
   gap: 0.55rem;
@@ -350,6 +362,10 @@ h1 {
 
 .warning-copy {
   color: #8b4027;
+}
+
+.objective-pass {
+  color: #1c5e4d;
 }
 
 @media (max-width: 960px) {

@@ -15,6 +15,8 @@
     "residentDemand",
     "developerPressure",
     "infrastructureMomentum",
+    "horizonTicks",
+    "objectives",
     "initialBudget",
     "initialPoliticalCapital",
     "agentProfiles",
@@ -34,6 +36,21 @@
     "residentDemand": { "type": "number" },
     "developerPressure": { "type": "number" },
     "infrastructureMomentum": { "type": "number" },
+    "horizonTicks": { "type": "integer", "minimum": 1 },
+    "objectives": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "metric", "target"],
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "metric": { "type": "string" },
+          "target": { "type": "number" },
+          "comparator": { "type": "string", "enum": ["at_least", "at_most"] }
+        }
+      }
+    },
     "initialBudget": { "type": "integer", "minimum": 0 },
     "initialPoliticalCapital": { "type": "integer", "minimum": 0 },
     "agentProfiles": {

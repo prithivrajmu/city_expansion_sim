@@ -11,6 +11,12 @@
   "residentDemand": 0.72,
   "developerPressure": 0.68,
   "infrastructureMomentum": 0.76,
+  "horizonTicks": 8,
+  "objectives": [
+    { "id": "growth", "title": "Urbanize the outer corridor", "metric": "urbanCells", "target": 16, "comparator": "at_least" },
+    { "id": "risk", "title": "Keep flood exposure under control", "metric": "averageRisk", "target": 0.34, "comparator": "at_most" },
+    { "id": "budget", "title": "Preserve enough budget for resilience work", "metric": "budget", "target": 140, "comparator": "at_least" }
+  ],
   "initialBudget": 620,
   "initialPoliticalCapital": 280,
   "agentProfiles": {
