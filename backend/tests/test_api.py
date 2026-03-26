@@ -97,6 +97,59 @@ def test_session_tick_command_and_report_flow():
     assert "resources" in report
     assert "objectives" in report
     assert "evaluation" in report
+    assert payload["campaign"] is None
+
+
+def test_campaign_listing_and_run_progression_flow():
+    client = app.test_client()
+
+    campaigns_response = client.get("/campaigns")
+    assert campaigns_response.status_code == 200
+    campaigns = campaigns_response.get_json()["items"]
+    assert any(item["id"] == "southern_growth_arc" for item in campaigns)
+
+    run_response = client.post("/campaigns/southern_growth_arc/runs")
+    assert run_response.status_code == 201
+    payload = run_response.get_json()
+    assert payload["campaign"]["campaignId"] == "southern_growth_arc"
+    assert payload["campaign"]["stageIndex"] == 0
+    assert payload["scenarioId"] == "chennai_coastal_corridor"
+
+    session_id = payload["sessionId"]
+    campaign_session = SESSION_STORE._sessions[session_id]
+    campaign_session.tick_count = campaign_session.scenario.horizonTicks
+    campaign_session.budget = 200
+    campaign_session.political_capital = 140
+    for cell in campaign_session.cells:
+        if cell["kind"] != "water":
+            cell["urbanized"] = True
+            cell["kind"] = "urban"
+            cell["risk"] = min(cell["risk"], 0.2)
+    campaign_session._record_history()
+
+    advance_response = client.post(f"/campaign-runs/{payload['campaign']['runId']}/advance")
+    assert advance_response.status_code == 201
+    advanced = advance_response.get_json()
+    assert advanced["campaign"]["stageIndex"] == 1
+    assert advanced["scenarioId"] == "metro_delta_arc"
+    assert advanced["snapshot"]["metrics"]["budget"] > 580
+    assert advanced["snapshot"]["metrics"]["politicalCapital"] > 260
+
+    run_status_response = client.get(f"/campaign-runs/{payload['campaign']['runId']}")
+    assert run_status_response.status_code == 200
+    run_status = run_status_response.get_json()
+    assert len(run_status["completedStages"]) == 1
+    assert run_status["currentStage"]["scenarioId"] == "metro_delta_arc"
+
+
+def test_campaign_advance_requires_horizon_completion():
+    client = app.test_client()
+    run_response = client.post("/campaigns/southern_growth_arc/runs")
+    run_payload = run_response.get_json()
+
+    response = client.post(f"/campaign-runs/{run_payload['campaign']['runId']}/advance")
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "bad_request"
 
 
 def test_save_load_and_replay_flow():
@@ -193,6 +246,13 @@ def test_invalid_scenario_id_returns_404():
 def test_invalid_save_id_returns_404():
     client = app.test_client()
     response = client.post("/saves/not-a-real-save/load")
+    assert response.status_code == 404
+    assert response.get_json()["error"] == "not_found"
+
+
+def test_invalid_campaign_id_returns_404():
+    client = app.test_client()
+    response = client.post("/campaigns/not-a-real-campaign/runs")
     assert response.status_code == 404
     assert response.get_json()["error"] == "not_found"
 

@@ -106,16 +106,24 @@ class TimelineEntry:
 
 
 class SimulationSession:
-    def __init__(self, scenario: Scenario) -> None:
+    def __init__(self, scenario: Scenario, resource_overrides: dict | None = None) -> None:
         self.scenario = scenario
         self.tick_count = 0
         self.cells = [cell.copy() for cell in scenario.cells]
         self.interventions: list[dict] = []
-        self.budget = scenario.initialBudget
-        self.political_capital = scenario.initialPoliticalCapital
+        resource_overrides = resource_overrides or {}
+        self.budget = int(resource_overrides.get("budget", scenario.initialBudget))
+        self.political_capital = int(
+            resource_overrides.get("politicalCapital", scenario.initialPoliticalCapital)
+        )
         self.events: list[str] = [
             f"Scenario '{scenario.name}' initialized with {len(self.cells)} cells."
         ]
+        if resource_overrides:
+            self.events.append(
+                "Campaign carryover applied: "
+                f"budget {self.budget}, political capital {self.political_capital}."
+            )
         self.applied_events: list[dict] = []
         self.history: list[dict] = []
         self._record_history()
@@ -725,8 +733,8 @@ class SimulationSession:
         return None
 
 
-def create_session_from_scenario(path: Path) -> SimulationSession:
+def create_session_from_scenario(path: Path, resource_overrides: dict | None = None) -> SimulationSession:
     with path.open("r", encoding="utf-8") as handle:
         data = json.load(handle)
     scenario = Scenario(**data)
-    return SimulationSession(scenario=scenario)
+    return SimulationSession(scenario=scenario, resource_overrides=resource_overrides)

@@ -1,0 +1,19 @@
+{
+  "id": "southern_growth_arc",
+  "name": "Southern Growth Arc",
+  "description": "A two-stage campaign that starts with transit-led coastal expansion and then rolls surplus capacity into a larger inland metro push.",
+  "stages": [
+    {
+      "id": "coastal_corridor",
+      "title": "Stabilize The Coastal Corridor",
+      "scenarioId": "chennai_coastal_corridor",
+      "summary": "Prove you can grow the corridor without losing resilience before the inland metro buildout."
+    },
+    {
+      "id": "metro_arc",
+      "title": "Scale The Inland Arc",
+      "scenarioId": "metro_delta_arc",
+      "summary": "Carry forward budget discipline and political strength into the larger metro expansion phase."
+    }
+  ]
+}

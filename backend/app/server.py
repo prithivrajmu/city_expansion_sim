@@ -94,6 +94,11 @@ def scenarios():
     return jsonify({"items": SESSION_STORE.list_scenarios()})
 
 
+@app.get("/campaigns")
+def campaigns():
+    return jsonify({"items": SESSION_STORE.list_campaigns()})
+
+
 @app.get("/saves")
 def saves():
     return jsonify({"items": SESSION_STORE.list_saves()})
@@ -106,6 +111,23 @@ def create_session():
     if not isinstance(scenario_id, str):
         raise ValueError("scenarioId must be a string")
     session = SESSION_STORE.create_session(scenario_id)
+    return jsonify(session.to_payload()), 201
+
+
+@app.post("/campaigns/<campaign_id>/runs")
+def create_campaign_run(campaign_id: str):
+    session = SESSION_STORE.create_campaign_run(campaign_id)
+    return jsonify(session.to_payload()), 201
+
+
+@app.get("/campaign-runs/<run_id>")
+def get_campaign_run(run_id: str):
+    return jsonify(SESSION_STORE.get_campaign_run(run_id))
+
+
+@app.post("/campaign-runs/<run_id>/advance")
+def advance_campaign_run(run_id: str):
+    session = SESSION_STORE.advance_campaign_run(run_id)
     return jsonify(session.to_payload()), 201
 
 

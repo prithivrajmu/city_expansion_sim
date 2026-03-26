@@ -57,6 +57,7 @@ The repo now includes a runnable vertical slice:
 - district intervention commands, constrained by budget and political capital
 - baseline-vs-run comparison views and intervention ROI reporting
 - multiple scenarios for cross-scenario runs
+- campaign runs with stage progression and carryover resources
 - saved sessions and replayable timeline history
 - `prstack` as the intended bootstrap and dev entrypoint
 

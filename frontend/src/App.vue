@@ -9,6 +9,43 @@ type Scenario = {
   ticksPerYear: number;
 };
 
+type CampaignStage = {
+  id: string;
+  title: string;
+  scenarioId: string;
+  summary: string;
+};
+
+type Campaign = {
+  id: string;
+  name: string;
+  description: string;
+  stageCount: number;
+  stages: CampaignStage[];
+};
+
+type CampaignState = {
+  runId: string;
+  campaignId: string;
+  campaignName: string;
+  description: string;
+  stageIndex: number;
+  stageCount: number;
+  currentStage: CampaignStage | null;
+  completedStages: string[];
+  stageResults: Array<{
+    stageId: string;
+    scenarioId: string;
+    headline: string;
+    status: string;
+    passedObjectives: number;
+    totalObjectives: number;
+    budget: number;
+    politicalCapital: number;
+  }>;
+  isComplete: boolean;
+};
+
 type SaveItem = {
   saveId: string;
   scenarioId: string;
@@ -87,6 +124,7 @@ type SessionResponse = {
   sessionId: string;
   scenarioId: string;
   snapshot: Snapshot;
+  campaign: CampaignState | null;
 };
 
 type Report = {
@@ -158,8 +196,10 @@ type Report = {
 const apiBase = "http://localhost:5001";
 const loading = ref(false);
 const scenarios = ref<Scenario[]>([]);
+const campaigns = ref<Campaign[]>([]);
 const saves = ref<SaveItem[]>([]);
 const selectedScenarioId = ref("chennai_coastal_corridor");
+const selectedCampaignId = ref("southern_growth_arc");
 const session = ref<SessionResponse | null>(null);
 const report = ref<Report | null>(null);
 const timeline = ref<TimelineEntry[]>([]);
@@ -198,6 +238,16 @@ const metricCards = computed(() => {
 });
 
 const districtOptions = computed(() => session.value?.snapshot.districts ?? []);
+const activeCampaign = computed(() => session.value?.campaign ?? null);
+const canAdvanceCampaign = computed(() => {
+  if (!activeCampaign.value || activeCampaign.value.isComplete || !report.value) {
+    return false;
+  }
+  return (
+    report.value.evaluation.tick >= report.value.evaluation.horizonTicks &&
+    report.value.evaluation.status === "success"
+  );
+});
 const topDistrictDeltas = computed(() => report.value?.districtComparison.slice(0, 4) ?? []);
 const topInterventionROI = computed(() => report.value?.interventionROI.slice().reverse().slice(0, 4) ?? []);
 const selectedDistrictCellCount = computed(() => {
@@ -250,6 +300,15 @@ async function fetchScenarios() {
   }
 }
 
+async function fetchCampaigns() {
+  const response = await fetch(`${apiBase}/campaigns`);
+  const data = await response.json();
+  campaigns.value = data.items;
+  if (campaigns.value.length > 0 && !campaigns.value.find((item) => item.id === selectedCampaignId.value)) {
+    selectedCampaignId.value = campaigns.value[0].id;
+  }
+}
+
 async function fetchSaves() {
   const response = await fetch(`${apiBase}/saves`);
   const data = await response.json();
@@ -290,6 +349,44 @@ async function createSession() {
       body: JSON.stringify({ scenarioId: selectedScenarioId.value })
     });
     session.value = await response.json();
+    selectedDistrict.value = session.value.snapshot.districts[0] ?? "";
+    replayTick.value = null;
+    replayState.value = null;
+    await refreshDerivedState();
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function createCampaignRun() {
+  loading.value = true;
+  try {
+    const response = await fetch(`${apiBase}/campaigns/${selectedCampaignId.value}/runs`, {
+      method: "POST"
+    });
+    session.value = await response.json();
+    selectedScenarioId.value = session.value.scenarioId;
+    selectedDistrict.value = session.value.snapshot.districts[0] ?? "";
+    replayTick.value = null;
+    replayState.value = null;
+    await refreshDerivedState();
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function advanceCampaign() {
+  if (!activeCampaign.value) {
+    return;
+  }
+
+  loading.value = true;
+  try {
+    const response = await fetch(`${apiBase}/campaign-runs/${activeCampaign.value.runId}/advance`, {
+      method: "POST"
+    });
+    session.value = await response.json();
+    selectedScenarioId.value = session.value.scenarioId;
     selectedDistrict.value = session.value.snapshot.districts[0] ?? "";
     replayTick.value = null;
     replayState.value = null;
@@ -419,7 +516,7 @@ watch(replayTick, async (value) => {
 });
 
 onMounted(async () => {
-  await Promise.all([fetchScenarios(), fetchSaves()]);
+  await Promise.all([fetchScenarios(), fetchCampaigns(), fetchSaves()]);
   await createSession();
 });
 </script>
@@ -452,6 +549,9 @@ onMounted(async () => {
           <button class="button button-primary" :disabled="loading" @click="createSession">
             New Session
           </button>
+          <button class="button" :disabled="loading" @click="createCampaignRun">
+            Start Campaign
+          </button>
           <button class="button" :disabled="loading || !session" @click="tick(1)">
             Tick +1
           </button>
@@ -464,6 +564,16 @@ onMounted(async () => {
           <input v-model="saveLabel" class="select text-input" type="text" placeholder="save label" />
           <button class="button" :disabled="loading || !session" @click="saveSession">Save Session</button>
         </div>
+
+        <label class="label" for="campaign">Campaign</label>
+        <select id="campaign" v-model="selectedCampaignId" class="select">
+          <option v-for="campaign in campaigns" :key="campaign.id" :value="campaign.id">
+            {{ campaign.name }}
+          </option>
+        </select>
+        <p class="support-copy">
+          {{ campaigns.find((item) => item.id === selectedCampaignId)?.description }}
+        </p>
       </div>
     </section>
 
@@ -611,6 +721,47 @@ onMounted(async () => {
         </div>
 
         <div class="panel">
+          <div v-if="activeCampaign" class="campaign-panel">
+            <div class="panel-header">
+              <div>
+                <p class="panel-kicker">Campaign</p>
+                <h2>{{ activeCampaign.campaignName }}</h2>
+              </div>
+              <span class="pill" :class="{ 'pill-success': activeCampaign.isComplete }">
+                {{ activeCampaign.isComplete ? "complete" : `stage ${activeCampaign.stageIndex + 1}/${activeCampaign.stageCount}` }}
+              </span>
+            </div>
+            <p class="panel-copy">
+              {{ activeCampaign.currentStage?.summary ?? activeCampaign.description }}
+            </p>
+            <div class="metrics comparison-metrics">
+              <article class="metric-card">
+                <span>Completed Stages</span>
+                <strong>{{ activeCampaign.completedStages.length }}</strong>
+              </article>
+              <article class="metric-card">
+                <span>Current Stage</span>
+                <strong>{{ activeCampaign.currentStage?.title ?? "Finished" }}</strong>
+              </article>
+            </div>
+            <button
+              class="button button-primary"
+              :disabled="loading || !canAdvanceCampaign"
+              @click="advanceCampaign"
+            >
+              Advance Campaign
+            </button>
+            <p v-if="!activeCampaign.isComplete && !canAdvanceCampaign && report" class="support-copy">
+              Advance unlocks after the current stage reaches its horizon and clears all objectives.
+            </p>
+            <ul class="event-list compact-list">
+              <li v-for="stage in activeCampaign.stageResults.slice().reverse()" :key="stage.stageId">
+                {{ stage.stageId }} | {{ stage.passedObjectives }}/{{ stage.totalObjectives }} objectives |
+                budget {{ stage.budget }} | policy {{ stage.politicalCapital }}
+              </li>
+            </ul>
+          </div>
+
           <div class="panel-header">
             <div>
               <p class="panel-kicker">Interventions</p>
