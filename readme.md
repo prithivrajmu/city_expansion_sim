@@ -58,6 +58,7 @@ The repo now includes a runnable vertical slice:
 - baseline-vs-run comparison views and intervention ROI reporting
 - multiple scenarios for cross-scenario runs
 - campaign runs with stage progression and carryover resources
+- scenario dossiers with authoring summaries and validation checks
 - saved sessions and replayable timeline history
 - `prstack` as the intended bootstrap and dev entrypoint
 

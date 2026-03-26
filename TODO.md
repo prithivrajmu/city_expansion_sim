@@ -23,6 +23,7 @@
 - [x] Create session lifecycle API
 - [x] Add scenario catalog endpoints
 - [x] Add campaign catalog and stage progression endpoints
+- [x] Add scenario detail and validation endpoints for authoring
 - [x] Add tick advancement endpoint
 - [x] Add metrics and event log endpoints
 - [x] Add command and report endpoints
@@ -33,6 +34,7 @@
 - [x] Build map or board viewport
 - [x] Build scenario setup flow
 - [x] Build campaign setup and progression flow
+- [x] Build scenario dossier and authoring validation view
 - [x] Build timeline and control panel
 - [x] Build overlays for growth, price, and population pressure
 - [x] Build intervention and report panels

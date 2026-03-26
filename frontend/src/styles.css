@@ -286,6 +286,19 @@ h1 {
   border-bottom: 1px solid rgba(19, 33, 27, 0.08);
 }
 
+.scenario-brief {
+  padding: 0.9rem 1rem;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.48);
+  border: 1px solid rgba(19, 33, 27, 0.08);
+}
+
+.authoring-panel {
+  margin-bottom: 1.4rem;
+  padding-bottom: 1.2rem;
+  border-bottom: 1px solid rgba(19, 33, 27, 0.08);
+}
+
 .slider-label {
   display: flex;
   flex-direction: column;

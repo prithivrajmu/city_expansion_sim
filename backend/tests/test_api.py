@@ -61,6 +61,40 @@ def test_health_endpoint():
     assert response.get_json() == {"status": "ok"}
 
 
+def test_scenario_detail_exposes_authoring_summary():
+    client = app.test_client()
+    response = client.get("/scenarios/chennai_coastal_corridor")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["scenario"]["id"] == "chennai_coastal_corridor"
+    assert payload["authoring"]["districtCount"] > 0
+    assert payload["validation"]["valid"] is True
+
+
+def test_authoring_validation_flags_invalid_scenario_shape():
+    client = app.test_client()
+    response = client.post(
+        "/authoring/validate/scenario",
+        json={
+            "id": "broken",
+            "name": "Broken Scenario",
+            "description": "Missing core fields and malformed references.",
+            "focus": "Validation",
+            "gridWidth": 2,
+            "gridHeight": 2,
+            "horizonTicks": 4,
+            "objectives": [{"id": "x", "title": "Bad", "metric": "notReal", "target": 1}],
+            "events": [{"tick": 1, "title": "Ghost event", "district": "Missing", "impact": {}}],
+            "cells": [{"district": "Only", "kind": "green", "urbanized": False, "population": 10, "landValue": 10, "risk": 0.1, "access": 0.2}],
+        },
+    )
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["valid"] is False
+    assert any(issue["field"] == "cells" for issue in payload["issues"])
+    assert any(issue["field"] == "objectives[0].metric" for issue in payload["issues"])
+
+
 def test_session_tick_command_and_report_flow():
     client = app.test_client()
 

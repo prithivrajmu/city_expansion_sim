@@ -9,6 +9,42 @@ type Scenario = {
   ticksPerYear: number;
 };
 
+type ScenarioDefinition = {
+  id: string;
+  name: string;
+  description: string;
+  focus: string;
+  horizonTicks: number;
+  objectives: Array<{ id: string; title: string; metric: string; target: number; comparator?: string }>;
+  events: Array<{ tick: number; title: string; district?: string }>;
+  districtStrategies?: Record<string, { mode?: string }>;
+};
+
+type ScenarioDetail = {
+  scenario: ScenarioDefinition;
+  authoring: {
+    cellCount: number;
+    expectedCellCount: number;
+    districtCount: number;
+    districts: string[];
+    objectiveCount: number;
+    eventCount: number;
+    waterCellCount: number;
+    horizonTicks: number;
+  };
+  validation: {
+    valid: boolean;
+    issues: Array<{ level: string; field: string; message: string }>;
+    summary: {
+      cellCount: number;
+      expectedCellCount: number;
+      districtCount: number;
+      objectiveCount: number;
+      eventCount: number;
+    };
+  };
+};
+
 type CampaignStage = {
   id: string;
   title: string;
@@ -201,6 +237,7 @@ const saves = ref<SaveItem[]>([]);
 const selectedScenarioId = ref("chennai_coastal_corridor");
 const selectedCampaignId = ref("southern_growth_arc");
 const session = ref<SessionResponse | null>(null);
+const scenarioDetail = ref<ScenarioDetail | null>(null);
 const report = ref<Report | null>(null);
 const timeline = ref<TimelineEntry[]>([]);
 const replayTick = ref<number | null>(null);
@@ -250,6 +287,12 @@ const canAdvanceCampaign = computed(() => {
 });
 const topDistrictDeltas = computed(() => report.value?.districtComparison.slice(0, 4) ?? []);
 const topInterventionROI = computed(() => report.value?.interventionROI.slice().reverse().slice(0, 4) ?? []);
+const authoringWarnings = computed(
+  () => scenarioDetail.value?.validation.issues.filter((item) => item.level !== "error") ?? []
+);
+const authoringErrors = computed(
+  () => scenarioDetail.value?.validation.issues.filter((item) => item.level === "error") ?? []
+);
 const selectedDistrictCellCount = computed(() => {
   if (!session.value || !selectedDistrict.value) {
     return 0;
@@ -307,6 +350,11 @@ async function fetchCampaigns() {
   if (campaigns.value.length > 0 && !campaigns.value.find((item) => item.id === selectedCampaignId.value)) {
     selectedCampaignId.value = campaigns.value[0].id;
   }
+}
+
+async function fetchScenarioDetail() {
+  const response = await fetch(`${apiBase}/scenarios/${selectedScenarioId.value}`);
+  scenarioDetail.value = await response.json();
 }
 
 async function fetchSaves() {
@@ -515,8 +563,13 @@ watch(replayTick, async (value) => {
   await fetchReplay(value);
 });
 
+watch(selectedScenarioId, async () => {
+  await fetchScenarioDetail();
+});
+
 onMounted(async () => {
   await Promise.all([fetchScenarios(), fetchCampaigns(), fetchSaves()]);
+  await fetchScenarioDetail();
   await createSession();
 });
 </script>
@@ -574,6 +627,19 @@ onMounted(async () => {
         <p class="support-copy">
           {{ campaigns.find((item) => item.id === selectedCampaignId)?.description }}
         </p>
+
+        <div v-if="scenarioDetail" class="scenario-brief">
+          <p class="panel-kicker">Authoring Brief</p>
+          <p class="support-copy">
+            {{ scenarioDetail.authoring.districtCount }} districts | {{ scenarioDetail.authoring.objectiveCount }}
+            objectives | {{ scenarioDetail.authoring.eventCount }} events | grid
+            {{ scenarioDetail.authoring.cellCount }}/{{ scenarioDetail.authoring.expectedCellCount }}
+          </p>
+          <p class="support-copy">
+            Validation {{ scenarioDetail.validation.valid ? "clean" : "needs work" }} |
+            errors {{ authoringErrors.length }} | warnings {{ authoringWarnings.length }}
+          </p>
+        </div>
       </div>
     </section>
 
@@ -721,6 +787,65 @@ onMounted(async () => {
         </div>
 
         <div class="panel">
+          <div v-if="scenarioDetail" class="authoring-panel">
+            <div class="panel-header">
+              <div>
+                <p class="panel-kicker">Scenario Authoring</p>
+                <h2>{{ scenarioDetail.scenario.name }}</h2>
+              </div>
+              <span class="pill" :class="scenarioDetail.validation.valid ? 'pill-success' : 'pill-at_risk'">
+                {{ scenarioDetail.validation.valid ? "valid" : "issues" }}
+              </span>
+            </div>
+            <p class="panel-copy">
+              {{ scenarioDetail.scenario.focus }}
+            </p>
+            <div class="two-column">
+              <div>
+                <p class="mini-heading">Districts</p>
+                <ul class="event-list compact-list">
+                  <li v-for="district in scenarioDetail.authoring.districts" :key="district">
+                    {{ district }}
+                    <span v-if="scenarioDetail.scenario.districtStrategies?.[district]">
+                      | {{ scenarioDetail.scenario.districtStrategies[district].mode }}
+                    </span>
+                  </li>
+                </ul>
+              </div>
+              <div>
+                <p class="mini-heading">Objectives</p>
+                <ul class="event-list compact-list">
+                  <li v-for="objective in scenarioDetail.scenario.objectives" :key="objective.id">
+                    {{ objective.title }} | {{ objective.metric }} |
+                    {{ objective.comparator === "at_most" ? "<=" : ">=" }} {{ objective.target }}
+                  </li>
+                </ul>
+              </div>
+            </div>
+            <div class="two-column">
+              <div>
+                <p class="mini-heading">Event Schedule</p>
+                <ul class="event-list compact-list">
+                  <li v-for="event in scenarioDetail.scenario.events" :key="`${event.tick}-${event.title}`">
+                    T{{ event.tick }} | {{ event.title }} | {{ event.district ?? "all" }}
+                  </li>
+                </ul>
+              </div>
+              <div>
+                <p class="mini-heading">Validation Issues</p>
+                <ul class="event-list compact-list">
+                  <li v-if="scenarioDetail.validation.issues.length === 0">No issues detected.</li>
+                  <li
+                    v-for="issue in scenarioDetail.validation.issues.slice(0, 6)"
+                    :key="`${issue.field}-${issue.message}`"
+                  >
+                    {{ issue.level }} | {{ issue.field }} | {{ issue.message }}
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
           <div v-if="activeCampaign" class="campaign-panel">
             <div class="panel-header">
               <div>

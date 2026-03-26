@@ -94,6 +94,17 @@ def scenarios():
     return jsonify({"items": SESSION_STORE.list_scenarios()})
 
 
+@app.get("/scenarios/<scenario_id>")
+def scenario_detail(scenario_id: str):
+    return jsonify(SESSION_STORE.scenario_definition(scenario_id))
+
+
+@app.post("/authoring/validate/scenario")
+def validate_scenario():
+    payload = require_json_object()
+    return jsonify(SESSION_STORE.validate_scenario_definition(payload))
+
+
 @app.get("/campaigns")
 def campaigns():
     return jsonify({"items": SESSION_STORE.list_campaigns()})

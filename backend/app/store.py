@@ -16,6 +16,22 @@ from simulation.core.engine import SimulationSession, create_session_from_scenar
 SCENARIOS_DIR = ROOT_DIR / "simulation" / "scenarios"
 CAMPAIGNS_DIR = ROOT_DIR / "simulation" / "campaigns"
 SAVES_DIR = ROOT_DIR / "simulation" / "saves"
+SUPPORTED_OBJECTIVE_METRICS = {
+    "urbanCells",
+    "population",
+    "averageLandValue",
+    "urbanizationRate",
+    "averageRisk",
+    "averageAccess",
+    "interventionCount",
+    "residentPressure",
+    "developerPressure",
+    "governmentPressure",
+    "eventCount",
+    "budget",
+    "politicalCapital",
+    "ticksRemaining",
+}
 
 
 @dataclass
@@ -58,6 +74,17 @@ class SessionStore:
             )
         return items
 
+    def scenario_definition(self, scenario_id: str) -> dict:
+        path = self._scenario_path(scenario_id)
+        with path.open("r", encoding="utf-8") as handle:
+            data = json.load(handle)
+        validation = self.validate_scenario_definition(data)
+        return {
+            "scenario": data,
+            "authoring": self._scenario_authoring_summary(data),
+            "validation": validation,
+        }
+
     def create_session(self, scenario_id: str) -> SessionEnvelope:
         scenario_path = self._scenario_path(scenario_id)
         session_id = str(uuid.uuid4())
@@ -81,6 +108,143 @@ class SessionStore:
                 }
             )
         return items
+
+    def validate_scenario_definition(self, data: dict) -> dict:
+        if not isinstance(data, dict):
+            raise ValueError("Scenario definition must be a JSON object")
+
+        issues: list[dict] = []
+        required_fields = [
+            "id",
+            "name",
+            "description",
+            "focus",
+            "baseYear",
+            "ticksPerYear",
+            "gridWidth",
+            "gridHeight",
+            "policyBoost",
+            "residentDemand",
+            "developerPressure",
+            "infrastructureMomentum",
+            "horizonTicks",
+            "objectives",
+            "initialBudget",
+            "initialPoliticalCapital",
+            "agentProfiles",
+            "events",
+            "cells",
+        ]
+
+        for field_name in required_fields:
+            if field_name not in data:
+                issues.append({"level": "error", "field": field_name, "message": "Missing required field"})
+
+        cells = data.get("cells")
+        if isinstance(cells, list):
+            expected_cells = data.get("gridWidth", 0) * data.get("gridHeight", 0)
+            if expected_cells and len(cells) != expected_cells:
+                issues.append(
+                    {
+                        "level": "error",
+                        "field": "cells",
+                        "message": f"Expected {expected_cells} cells from grid dimensions, found {len(cells)}",
+                    }
+                )
+        else:
+            issues.append({"level": "error", "field": "cells", "message": "cells must be an array"})
+            cells = []
+
+        districts = {
+            cell.get("district")
+            for cell in cells
+            if isinstance(cell, dict) and cell.get("kind") != "water" and cell.get("district")
+        }
+
+        objectives = data.get("objectives")
+        if not isinstance(objectives, list) or not objectives:
+            issues.append({"level": "error", "field": "objectives", "message": "At least one objective is required"})
+            objectives = []
+
+        for index, objective in enumerate(objectives):
+            if not isinstance(objective, dict):
+                issues.append(
+                    {"level": "error", "field": f"objectives[{index}]", "message": "Objective must be an object"}
+                )
+                continue
+            metric = objective.get("metric")
+            comparator = objective.get("comparator", "at_least")
+            if metric not in SUPPORTED_OBJECTIVE_METRICS:
+                issues.append(
+                    {
+                        "level": "error",
+                        "field": f"objectives[{index}].metric",
+                        "message": f"Unsupported metric: {metric}",
+                    }
+                )
+            if comparator not in {"at_least", "at_most"}:
+                issues.append(
+                    {
+                        "level": "error",
+                        "field": f"objectives[{index}].comparator",
+                        "message": f"Unsupported comparator: {comparator}",
+                    }
+                )
+
+        events = data.get("events")
+        if not isinstance(events, list):
+            issues.append({"level": "error", "field": "events", "message": "events must be an array"})
+            events = []
+        for index, event in enumerate(events):
+            if not isinstance(event, dict):
+                issues.append({"level": "error", "field": f"events[{index}]", "message": "Event must be an object"})
+                continue
+            district = event.get("district")
+            if district and district not in districts:
+                issues.append(
+                    {
+                        "level": "warning",
+                        "field": f"events[{index}].district",
+                        "message": f"Event district not found in non-water cells: {district}",
+                    }
+                )
+
+        strategies = data.get("districtStrategies") or {}
+        if not isinstance(strategies, dict):
+            issues.append(
+                {"level": "error", "field": "districtStrategies", "message": "districtStrategies must be an object"}
+            )
+            strategies = {}
+        else:
+            for district in strategies:
+                if district not in districts:
+                    issues.append(
+                        {
+                            "level": "warning",
+                            "field": f"districtStrategies.{district}",
+                            "message": "Strategy district not found in non-water cells",
+                        }
+                    )
+
+        for index, cell in enumerate(cells):
+            if not isinstance(cell, dict):
+                issues.append({"level": "error", "field": f"cells[{index}]", "message": "Cell must be an object"})
+                continue
+            if cell.get("kind") == "water" and cell.get("urbanized"):
+                issues.append(
+                    {
+                        "level": "warning",
+                        "field": f"cells[{index}].urbanized",
+                        "message": "Water cells should generally not start urbanized",
+                    }
+                )
+
+        summary = self._scenario_authoring_summary(data)
+        return {
+            "valid": not any(item["level"] == "error" for item in issues),
+            "issues": issues,
+            "summary": summary,
+        }
 
     def create_campaign_run(self, campaign_id: str) -> SessionEnvelope:
         campaign = self._campaign_definition(campaign_id)
@@ -261,6 +425,22 @@ class SessionStore:
         if not path.is_file():
             raise FileNotFoundError(f"Scenario not found: {safe_id}")
         return path
+
+    def _scenario_authoring_summary(self, data: dict) -> dict:
+        cells = data.get("cells", [])
+        non_water_cells = [cell for cell in cells if isinstance(cell, dict) and cell.get("kind") != "water"]
+        districts = sorted({cell["district"] for cell in non_water_cells if cell.get("district")})
+        water_cells = sum(1 for cell in cells if isinstance(cell, dict) and cell.get("kind") == "water")
+        return {
+            "cellCount": len(cells),
+            "expectedCellCount": data.get("gridWidth", 0) * data.get("gridHeight", 0),
+            "districtCount": len(districts),
+            "districts": districts,
+            "objectiveCount": len(data.get("objectives", [])),
+            "eventCount": len(data.get("events", [])),
+            "waterCellCount": water_cells,
+            "horizonTicks": data.get("horizonTicks"),
+        }
 
     def _campaign_definition(self, campaign_id: str) -> dict:
         safe_id = self._normalize_identifier(campaign_id)
