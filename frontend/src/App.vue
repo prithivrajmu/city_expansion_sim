@@ -18,6 +18,13 @@ type ScenarioDefinition = {
   objectives: Array<{ id: string; title: string; metric: string; target: number; comparator?: string }>;
   events: Array<{ tick: number; title: string; district?: string }>;
   districtStrategies?: Record<string, { mode?: string }>;
+  districtAgents?: Record<string, {
+    residentDemandBias?: number;
+    developerIntensity?: number;
+    governmentSupport?: number;
+    policyFriction?: number;
+    resiliencePriority?: number;
+  }>;
 };
 
 type ScenarioDetail = {
@@ -177,6 +184,16 @@ type Report = {
     developers: Record<string, number>;
     government: Record<string, number>;
   };
+  districtAgents: Array<{
+    district: string;
+    residentDemandBias: number;
+    developerIntensity: number;
+    governmentSupport: number;
+    policyFriction: number;
+    resiliencePriority: number;
+    growthReadiness: number;
+    districtRisk: number;
+  }>;
   comparison: {
     baselineTick: number;
     currentTick: number;
@@ -287,6 +304,7 @@ const canAdvanceCampaign = computed(() => {
 });
 const topDistrictDeltas = computed(() => report.value?.districtComparison.slice(0, 4) ?? []);
 const topInterventionROI = computed(() => report.value?.interventionROI.slice().reverse().slice(0, 4) ?? []);
+const topDistrictAgents = computed(() => report.value?.districtAgents.slice().sort((a, b) => b.growthReadiness - a.growthReadiness).slice(0, 4) ?? []);
 const authoringWarnings = computed(
   () => scenarioDetail.value?.validation.issues.filter((item) => item.level !== "error") ?? []
 );
@@ -1003,10 +1021,34 @@ onMounted(async () => {
               </ul>
             </div>
             <div>
+              <p class="mini-heading">District Agent Pressure</p>
+              <ul class="event-list compact-list">
+                <li v-for="item in topDistrictAgents" :key="`${item.district}-agent`">
+                  {{ item.district }} | growth {{ item.growthReadiness }} | friction {{ item.policyFriction }} |
+                  resilience {{ item.resiliencePriority }}
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="two-column">
+            <div>
               <p class="mini-heading">Scenario Events</p>
               <ul class="event-list compact-list">
                 <li v-for="item in report.scenarioEvents.slice().reverse()" :key="`${item.tick}-${item.title}`">
                   T{{ item.tick }} | {{ item.title }} | {{ item.district }}
+                </li>
+              </ul>
+            </div>
+            <div>
+              <p class="mini-heading">Authoring Stances</p>
+              <ul class="event-list compact-list">
+                <li
+                  v-for="(stance, district) in scenarioDetail?.scenario.districtAgents ?? {}"
+                  :key="`${district}-stance`"
+                >
+                  {{ district }} | demand {{ stance.residentDemandBias ?? 1 }} | dev {{ stance.developerIntensity ?? 1 }} |
+                  gov {{ stance.governmentSupport ?? 1 }}
                 </li>
               </ul>
             </div>

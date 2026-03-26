@@ -46,6 +46,7 @@
 - [x] Implement first deterministic tick loop
 - [x] Add infrastructure influence model
 - [x] Add land value and housing pressure model
+- [x] Add district-level agent stances that change local growth and intervention behavior
 - [ ] Reintroduce Chennai as a scenario rather than a hardcoded app target
 - [x] Add a second scenario for cross-scenario verification
 - [x] Add session persistence and replay history

@@ -3,7 +3,7 @@ from app.store import SESSION_STORE
 from simulation.core.engine import Scenario, SimulationSession
 
 
-def make_strategy_scenario(district_strategies=None):
+def make_strategy_scenario(district_strategies=None, district_agents=None):
     return Scenario(
         id="district-strategy-test",
         name="District Strategy Test",
@@ -51,6 +51,7 @@ def make_strategy_scenario(district_strategies=None):
             },
         ],
         districtStrategies=district_strategies,
+        districtAgents=district_agents,
     )
 
 
@@ -270,6 +271,73 @@ def test_district_without_strategy_uses_safe_defaults():
     assert unconfigured_resilience["risk"] == baseline_resilience["risk"]
 
 
+def test_district_agent_stances_change_growth_and_risk_behavior():
+    session = SimulationSession(
+        make_strategy_scenario(
+            district_agents={
+                "Growth District": {
+                    "residentDemandBias": 1.2,
+                    "developerIntensity": 1.18,
+                    "governmentSupport": 1.1,
+                    "policyFriction": 0.92,
+                    "resiliencePriority": 0.9,
+                },
+                "Resilience District": {
+                    "residentDemandBias": 0.92,
+                    "developerIntensity": 0.88,
+                    "governmentSupport": 1.04,
+                    "policyFriction": 1.08,
+                    "resiliencePriority": 1.2,
+                },
+            }
+        )
+    )
+
+    session.tick()
+
+    growth_cell, resilience_cell = session.cells
+    assert growth_cell["population"] > resilience_cell["population"]
+    assert growth_cell["landValue"] > resilience_cell["landValue"]
+    assert growth_cell["risk"] > resilience_cell["risk"]
+
+
+def test_district_agent_stances_change_command_cost_and_effect():
+    growth_session = SimulationSession(
+        make_strategy_scenario(
+            district_agents={
+                "Growth District": {
+                    "residentDemandBias": 1.1,
+                    "developerIntensity": 1.12,
+                    "governmentSupport": 1.15,
+                    "policyFriction": 0.85,
+                    "resiliencePriority": 0.9,
+                }
+            }
+        )
+    )
+    resilience_session = SimulationSession(
+        make_strategy_scenario(
+            district_agents={
+                "Resilience District": {
+                    "residentDemandBias": 0.94,
+                    "developerIntensity": 0.86,
+                    "governmentSupport": 1.05,
+                    "policyFriction": 1.18,
+                    "resiliencePriority": 1.22,
+                }
+            }
+        )
+    )
+
+    growth_session.apply_command({"type": "build_transit", "district": "Growth District", "strength": 0.2})
+    resilience_session.apply_command({"type": "build_transit", "district": "Resilience District", "strength": 0.2})
+
+    growth_cost = growth_session.interventions[-1]["cost"]["politicalCapital"]
+    resilience_cost = resilience_session.interventions[-1]["cost"]["politicalCapital"]
+    assert growth_cost < resilience_cost
+    assert growth_session.cells[0]["access"] > resilience_session.cells[1]["access"]
+
+
 def test_invalid_scenario_id_returns_404():
     client = app.test_client()
     response = client.post("/sessions", json={"scenarioId": "../missing"})
@@ -306,6 +374,7 @@ def test_report_exposes_baseline_deltas_and_intervention_roi():
     assert report["comparison"]["currentTick"] == 2
     assert any(item["district"] == "Outer Arc" for item in report["districtComparison"])
     assert any(item["type"] == "build_transit" for item in report["interventionROI"])
+    assert any(item["district"] == "Outer Arc" for item in report["districtAgents"])
 
 
 def test_intervention_requires_budget_and_political_capital():

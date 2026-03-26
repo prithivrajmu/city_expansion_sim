@@ -61,6 +61,19 @@
         "government": { "type": "object" }
       }
     },
+    "districtAgents": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "residentDemandBias": { "type": "number" },
+          "developerIntensity": { "type": "number" },
+          "governmentSupport": { "type": "number" },
+          "policyFriction": { "type": "number" },
+          "resiliencePriority": { "type": "number" }
+        }
+      }
+    },
     "districtStrategies": {
       "type": "object",
       "additionalProperties": {

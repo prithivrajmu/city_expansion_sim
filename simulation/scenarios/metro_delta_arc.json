@@ -24,6 +24,13 @@
     "developers": { "capitalAggression": 1.12, "speculation": 1.08 },
     "government": { "deliveryBias": 0.98, "coordination": 1.06 }
   },
+  "districtAgents": {
+    "Freight Edge": { "residentDemandBias": 0.96, "developerIntensity": 1.16, "governmentSupport": 1.04, "policyFriction": 0.94, "resiliencePriority": 0.92 },
+    "Innovation Mile": { "residentDemandBias": 1.08, "developerIntensity": 1.18, "governmentSupport": 1.06, "policyFriction": 0.9, "resiliencePriority": 0.88 },
+    "Outer Arc": { "residentDemandBias": 1.1, "developerIntensity": 1.08, "governmentSupport": 1.0, "policyFriction": 0.98, "resiliencePriority": 0.95 },
+    "Low Basin": { "residentDemandBias": 0.88, "developerIntensity": 0.8, "governmentSupport": 1.1, "policyFriction": 1.08, "resiliencePriority": 1.24 },
+    "Reserve Belt": { "residentDemandBias": 0.94, "developerIntensity": 0.9, "governmentSupport": 0.98, "policyFriction": 1.02, "resiliencePriority": 1.14 }
+  },
   "districtStrategies": {
     "Innovation Mile": { "mode": "growth_first" },
     "Outer Arc": { "mode": "growth_first" },

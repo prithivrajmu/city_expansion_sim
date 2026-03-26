@@ -24,6 +24,13 @@
     "developers": { "capitalAggression": 1.02, "speculation": 1.06 },
     "government": { "deliveryBias": 1.05, "coordination": 1.03 }
   },
+  "districtAgents": {
+    "North Harbor": { "residentDemandBias": 1.06, "developerIntensity": 1.02, "governmentSupport": 1.05, "policyFriction": 0.96, "resiliencePriority": 0.96 },
+    "Tech Spine": { "residentDemandBias": 1.08, "developerIntensity": 1.14, "governmentSupport": 1.08, "policyFriction": 0.92, "resiliencePriority": 0.9 },
+    "Outer Growth": { "residentDemandBias": 1.12, "developerIntensity": 1.1, "governmentSupport": 1.02, "policyFriction": 1.0, "resiliencePriority": 0.94 },
+    "Floodplain": { "residentDemandBias": 0.92, "developerIntensity": 0.82, "governmentSupport": 1.08, "policyFriction": 1.06, "resiliencePriority": 1.22 },
+    "Reserve Belt": { "residentDemandBias": 0.9, "developerIntensity": 0.84, "governmentSupport": 1.0, "policyFriction": 1.04, "resiliencePriority": 1.16 }
+  },
   "districtStrategies": {
     "Tech Spine": { "mode": "growth_first" },
     "Outer Growth": { "mode": "growth_first" },

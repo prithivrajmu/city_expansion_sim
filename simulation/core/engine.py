@@ -45,6 +45,14 @@ COMMAND_COST_FACTORS = {
     "flood_barrier": {"budget": 18, "politicalCapital": 9, "strengthBudget": 160, "strengthPoliticalCapital": 70},
 }
 
+DEFAULT_DISTRICT_AGENT_STANCE = {
+    "residentDemandBias": 1.0,
+    "developerIntensity": 1.0,
+    "governmentSupport": 1.0,
+    "policyFriction": 1.0,
+    "resiliencePriority": 1.0,
+}
+
 
 @dataclass
 class CellSnapshot:
@@ -93,6 +101,7 @@ class Scenario:
     events: list[dict]
     cells: list[dict]
     districtStrategies: dict[str, dict] | None = None
+    districtAgents: dict[str, dict] | None = None
 
 
 @dataclass
@@ -139,41 +148,55 @@ class SimulationSession:
 
         for index, cell in enumerate(self.cells):
             strategy = self._district_strategy(cell["district"])
+            stance = self._district_agent_stance(cell["district"])
             urban_neighbors = self._urban_neighbor_ratio(index, width)
             growth_signal = (
                 urban_neighbors * 0.8
                 + cell["access"] * self.scenario.infrastructureMomentum
-                + resident_pressure * 0.4
-                + developer_pressure * 0.35
-                + government_pressure * 0.2
+                + resident_pressure * 0.4 * stance["residentDemandBias"]
+                + developer_pressure * 0.35 * stance["developerIntensity"]
+                + government_pressure * 0.2 * stance["governmentSupport"]
                 + strategy["growth_signal_bias"]
-                - cell["risk"] * 0.55 * strategy["risk_weight"]
+                - cell["risk"] * 0.55 * strategy["risk_weight"] * stance["resiliencePriority"]
             )
-            threshold = 1.2 - self.scenario.policyBoost + strategy["conversion_threshold_delta"]
+            threshold = (
+                1.2
+                - self.scenario.policyBoost
+                + strategy["conversion_threshold_delta"]
+                + ((stance["policyFriction"] - 1.0) * 0.14)
+            )
 
             next_cell = cell.copy()
             if cell["kind"] != "water":
                 next_cell["access"] = self._clamp(cell["access"] + strategy["access_drift"])
-                next_cell["risk"] = self._clamp(cell["risk"] + strategy["risk_drift"])
+                next_cell["risk"] = self._clamp(
+                    cell["risk"] + strategy["risk_drift"] - ((stance["resiliencePriority"] - 1.0) * 0.015)
+                )
             if not cell["urbanized"] and cell["kind"] != "water" and growth_signal >= threshold:
                 next_cell["urbanized"] = True
                 next_cell["kind"] = "urban"
-                next_cell["population"] += self._scaled_value(120, strategy["population_multiplier"])
-                next_cell["landValue"] += self._scaled_value(80, strategy["land_value_multiplier"])
+                next_cell["population"] += self._scaled_value(
+                    120,
+                    strategy["population_multiplier"] * ((stance["residentDemandBias"] + stance["developerIntensity"]) / 2),
+                )
+                next_cell["landValue"] += self._scaled_value(
+                    80,
+                    strategy["land_value_multiplier"] * ((stance["developerIntensity"] + stance["governmentSupport"]) / 2),
+                )
                 conversions += 1
             elif cell["urbanized"]:
                 next_cell["population"] += self._scaled_value(
                     18 + (next_cell["access"] * 12) - (next_cell["risk"] * 6),
-                    strategy["population_multiplier"],
+                    strategy["population_multiplier"] * stance["residentDemandBias"],
                 )
                 next_cell["landValue"] += self._scaled_value(
                     12 + (urban_neighbors * 10),
-                    strategy["land_value_multiplier"],
+                    strategy["land_value_multiplier"] * stance["developerIntensity"],
                 )
             else:
                 next_cell["landValue"] += self._scaled_value(
                     2 + (next_cell["access"] * 4) - (next_cell["risk"] * 2),
-                    strategy["land_value_multiplier"],
+                    strategy["land_value_multiplier"] * ((stance["developerIntensity"] + stance["resiliencePriority"]) / 2),
                 )
 
             next_cells.append(next_cell)
@@ -208,6 +231,8 @@ class SimulationSession:
             raise ValueError("Command requires at least one non-water cell in the selected district")
 
         cost = self.command_cost(command_type, touched, strength)
+        stance = self._district_agent_stance(district) if district else DEFAULT_DISTRICT_AGENT_STANCE
+        cost["politicalCapital"] = int(round(cost["politicalCapital"] * stance["policyFriction"]))
         if self.budget < cost["budget"]:
             raise ValueError(
                 f"Insufficient budget for {command_type}: need {cost['budget']}, have {self.budget}"
@@ -229,15 +254,18 @@ class SimulationSession:
                 continue
 
             if command_type == "upzone_district":
+                upzone_multiplier = max(0.7, (stance["developerIntensity"] + stance["governmentSupport"]) / 2)
                 cell["landValue"] += int(16 + (strength * 40))
-                cell["population"] += int(10 + (strength * 28))
-                cell["access"] = min(1.0, cell["access"] + strength * 0.2)
+                cell["population"] += int((10 + (strength * 28)) * upzone_multiplier)
+                cell["access"] = min(1.0, cell["access"] + (strength * 0.2 * stance["governmentSupport"]))
             elif command_type == "build_transit":
-                cell["access"] = min(1.0, cell["access"] + strength)
-                cell["landValue"] += int(14 + (strength * 30))
+                transit_multiplier = max(0.75, (stance["governmentSupport"] + stance["residentDemandBias"]) / 2)
+                cell["access"] = min(1.0, cell["access"] + (strength * transit_multiplier))
+                cell["landValue"] += int((14 + (strength * 30)) * transit_multiplier)
             elif command_type == "flood_barrier":
-                cell["risk"] = max(0.0, cell["risk"] - strength)
-                cell["landValue"] += int(8 + (strength * 20))
+                resilience_multiplier = max(0.75, (stance["resiliencePriority"] + stance["governmentSupport"]) / 2)
+                cell["risk"] = max(0.0, cell["risk"] - (strength * resilience_multiplier))
+                cell["landValue"] += int((8 + (strength * 20)) * resilience_multiplier)
             touched += 1
 
         applied = {
@@ -363,6 +391,16 @@ class SimulationSession:
             if key in definition:
                 strategy[key] = definition[key]
         return strategy
+
+    def _district_agent_stance(self, district: str | None) -> dict:
+        if not district:
+            return DEFAULT_DISTRICT_AGENT_STANCE
+        definition = (self.scenario.districtAgents or {}).get(district, {})
+        stance = DEFAULT_DISTRICT_AGENT_STANCE.copy()
+        for key in DEFAULT_DISTRICT_AGENT_STANCE:
+            if key in definition:
+                stance[key] = float(definition[key])
+        return stance
 
     def _clamp(self, value: float) -> float:
         return min(1.0, max(0.0, round(value, 3)))
@@ -555,6 +593,7 @@ class SimulationSession:
             "recentEvents": list(self.events[-5:]),
             "timeline": [asdict(entry) for entry in self.timeline()],
             "agentSummary": self.scenario.agentProfiles,
+            "districtAgents": self._district_agent_summary(),
             "comparison": comparison,
             "districtComparison": self._district_comparison(baseline_entry),
             "interventionROI": self._intervention_roi(),
@@ -667,6 +706,33 @@ class SimulationSession:
                     "riskDelta": round(current["risk"] - baseline["risk"], 3),
                     "accessDelta": round(current["access"] - baseline["access"], 3),
                     "urbanCellsDelta": current["urbanCells"] - baseline["urbanCells"],
+                }
+            )
+        return items
+
+    def _district_agent_summary(self) -> list[dict]:
+        items: list[dict] = []
+        district_metrics = self._district_metrics(self.cells)
+        for district in sorted(district_metrics):
+            stance = self._district_agent_stance(district)
+            items.append(
+                {
+                    "district": district,
+                    "residentDemandBias": round(stance["residentDemandBias"], 3),
+                    "developerIntensity": round(stance["developerIntensity"], 3),
+                    "governmentSupport": round(stance["governmentSupport"], 3),
+                    "policyFriction": round(stance["policyFriction"], 3),
+                    "resiliencePriority": round(stance["resiliencePriority"], 3),
+                    "growthReadiness": round(
+                        (
+                            stance["residentDemandBias"]
+                            + stance["developerIntensity"]
+                            + stance["governmentSupport"]
+                        )
+                        / 3,
+                        3,
+                    ),
+                    "districtRisk": district_metrics[district]["risk"],
                 }
             )
         return items

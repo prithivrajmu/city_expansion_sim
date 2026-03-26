@@ -226,6 +226,22 @@ class SessionStore:
                         }
                     )
 
+        district_agents = data.get("districtAgents") or {}
+        if not isinstance(district_agents, dict):
+            issues.append(
+                {"level": "error", "field": "districtAgents", "message": "districtAgents must be an object"}
+            )
+        else:
+            for district in district_agents:
+                if district not in districts:
+                    issues.append(
+                        {
+                            "level": "warning",
+                            "field": f"districtAgents.{district}",
+                            "message": "District agent stance not found in non-water cells",
+                        }
+                    )
+
         for index, cell in enumerate(cells):
             if not isinstance(cell, dict):
                 issues.append({"level": "error", "field": f"cells[{index}]", "message": "Cell must be an object"})
